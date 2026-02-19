@@ -1,6 +1,5 @@
 package com.example.demo.user;
 
-
 import jakarta.persistence.*;
 
 @Entity
@@ -18,13 +17,13 @@ public class User {
     private String email;
 
     @Column(nullable = false)
-    private String password;
+    private String password; // hashed
 
     @Column(nullable = false)
-    private String role;
+    private String role; // OWNER / ADMIN / STAFF
 
     @Column(nullable = false)
-    private String status;
+    private String status; // ACTIVE / DEACTIVATED
 
     public User() {}
 

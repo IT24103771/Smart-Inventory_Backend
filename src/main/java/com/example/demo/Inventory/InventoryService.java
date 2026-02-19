@@ -20,13 +20,23 @@ public class InventoryService {
         this.productRepository = productRepository;
     }
 
+    // ✅ CREATE (blocks duplicate batch per product)
     public InventoryResponse create(CreateInventoryRequest req) {
+
         Product product = productRepository.findById(req.getProductId())
                 .orElseThrow(() -> new RuntimeException("Product not found: " + req.getProductId()));
 
+        String batchNo = req.getBatchNumber() == null ? "" : req.getBatchNumber().trim();
+        if (batchNo.isEmpty()) throw new RuntimeException("Batch number is required.");
+
+        // ✅ Prevent Milk + B01 duplication
+        if (inventoryRepository.existsByProductIdAndBatchNumber(req.getProductId(), batchNo)) {
+            throw new RuntimeException("This batch number already exists for the selected product.");
+        }
+
         Inventory inv = new Inventory();
         inv.setProduct(product);
-        inv.setBatchNumber(req.getBatchNumber().trim());
+        inv.setBatchNumber(batchNo);
         inv.setQuantity(req.getQuantity());
         inv.setExpiryDate(req.getExpiryDate());
 
@@ -39,15 +49,39 @@ public class InventoryService {
                 .stream().map(this::toResponse).toList();
     }
 
+    // ✅ NEW: For Sales page dropdown (only qty > 0, earliest expiry first)
+    public List<InventoryResponse> getAvailableBatches(Long productId) {
+        return inventoryRepository.findAvailableBatchesByProductId(productId)
+                .stream().map(this::toResponse).toList();
+    }
+
+    // ✅ UPDATE (blocks duplicates if user tries to change into an existing batch)
     public InventoryResponse update(Long id, CreateInventoryRequest req) {
+
         Inventory inv = inventoryRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Inventory not found: " + id));
 
         Product product = productRepository.findById(req.getProductId())
                 .orElseThrow(() -> new RuntimeException("Product not found: " + req.getProductId()));
 
+        String newBatchNo = req.getBatchNumber() == null ? "" : req.getBatchNumber().trim();
+        if (newBatchNo.isEmpty()) throw new RuntimeException("Batch number is required.");
+
+        Long newProductId = product.getId();
+
+        // ✅ If user is changing product or batch number, check duplicates
+        boolean changedProduct = !inv.getProduct().getId().equals(newProductId);
+        boolean changedBatch = !inv.getBatchNumber().equalsIgnoreCase(newBatchNo);
+
+        if (changedProduct || changedBatch) {
+            // If another record already has same productId + batchNo => block
+            if (inventoryRepository.existsByProductIdAndBatchNumber(newProductId, newBatchNo)) {
+                throw new RuntimeException("This batch number already exists for the selected product.");
+            }
+        }
+
         inv.setProduct(product);
-        inv.setBatchNumber(req.getBatchNumber().trim());
+        inv.setBatchNumber(newBatchNo);
         inv.setQuantity(req.getQuantity());
         inv.setExpiryDate(req.getExpiryDate());
 
@@ -55,12 +89,16 @@ public class InventoryService {
         return toResponse(saved);
     }
 
+    // ✅ DELETE (safer)
     public void delete(Long id) {
+        if (!inventoryRepository.existsById(id)) {
+            throw new RuntimeException("Inventory not found: " + id);
+        }
         inventoryRepository.deleteById(id);
     }
 
     /* =========================================================
-       ✅ NEW: Consume stock for Sales (FEFO by expiry date)
+       ✅ Existing: Consume stock for Sales (FEFO auto by expiry date)
        - Uses earliest expiry first
        - Ignores expired batches
        - Throws error if not enough stock
@@ -69,12 +107,10 @@ public class InventoryService {
     public void consumeStock(Long productId, int saleQty) {
         if (saleQty <= 0) throw new RuntimeException("Sale quantity must be greater than 0.");
 
-        // get batches for this product sorted by expiry
         List<Inventory> batches = inventoryRepository.findByProductIdOrderByExpiryAsc(productId);
 
         LocalDate today = LocalDate.now();
 
-        // only use non-expired batches
         List<Inventory> usable = batches.stream()
                 .filter(b -> b.getQuantity() != null && b.getQuantity() > 0)
                 .filter(b -> b.getExpiryDate() != null && !b.getExpiryDate().isBefore(today))
@@ -100,7 +136,6 @@ public class InventoryService {
             inventoryRepository.save(b);
         }
     }
-
     /* ========================================================= */
 
     private String status(LocalDate expiry) {

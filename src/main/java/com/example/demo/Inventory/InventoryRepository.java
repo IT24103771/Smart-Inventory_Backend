@@ -9,15 +9,57 @@ import java.util.List;
 public interface InventoryRepository extends JpaRepository<Inventory, Long> {
 
     // ✅ For inventory page listing (all batches with product info)
-    @Query("SELECT i FROM Inventory i JOIN FETCH i.product p ORDER BY i.expiryDate ASC")
+    @Query("SELECT i FROM Inventory i JOIN FETCH i.product ORDER BY i.expiryDate ASC")
     List<Inventory> findAllWithProductOrderByExpiryAsc();
 
-    // ✅ IMPORTANT: for Sales -> reduce stock (only this product, earliest expiry first)
-    @Query("SELECT i FROM Inventory i JOIN FETCH i.product p " +
-            "WHERE p.id = :productId ORDER BY i.expiryDate ASC")
+    // ✅ IMPORTANT: for Sales (all batches for a product, earliest expiry first)
+    @Query("""
+            SELECT i FROM Inventory i
+            JOIN FETCH i.product
+            WHERE i.product.id = :productId
+            ORDER BY i.expiryDate ASC
+           """)
     List<Inventory> findByProductIdOrderByExpiryAsc(@Param("productId") Long productId);
+
+    // ✅ Sales dropdown: only batches that have stock (> 0)
+    @Query("""
+            SELECT i FROM Inventory i
+            JOIN FETCH i.product
+            WHERE i.product.id = :productId
+              AND i.quantity > 0
+            ORDER BY i.expiryDate ASC
+           """)
+    List<Inventory> findAvailableBatchesByProductId(@Param("productId") Long productId);
+
+    // ✅ Prevent duplicate batch per product (Milk + B01 cannot repeat)
+    boolean existsByProductIdAndBatchNumber(Long productId, String batchNumber);
 
     // ✅ Optional: total available quantity for a product (helps validation)
     @Query("SELECT COALESCE(SUM(i.quantity),0) FROM Inventory i WHERE i.product.id = :productId")
     Integer getTotalQuantityByProductId(@Param("productId") Long productId);
+    @Query("SELECT COALESCE(SUM(i.quantity),0) FROM Inventory i")
+    Long getTotalStockQty();
+
+    @Query("""
+       SELECT COUNT(i)
+       FROM Inventory i
+       WHERE i.quantity <= i.product.reorderLevel
+       """)
+    Long countLowStockBatches();
+
+    @Query("""
+       SELECT COUNT(i)
+       FROM Inventory i
+       WHERE i.expiryDate < :today
+       """)
+    Long countExpiredBatches(@Param("today") java.time.LocalDate today);
+
+    @Query("""
+       SELECT COUNT(i)
+       FROM Inventory i
+       WHERE i.expiryDate >= :today AND i.expiryDate <= :soon
+       """)
+    Long countExpiringSoonBatches(@Param("today") java.time.LocalDate today,
+                                  @Param("soon") java.time.LocalDate soon);
+
 }

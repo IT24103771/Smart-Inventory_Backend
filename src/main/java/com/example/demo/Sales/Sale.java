@@ -1,5 +1,6 @@
 package com.example.demo.Sales;
 
+import com.example.demo.Inventory.Inventory;
 import com.example.demo.Products.Product;
 import jakarta.persistence.*;
 
@@ -18,6 +19,11 @@ public class Sale {
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
+    // ✅ NEW: keep which batch was used
+    @ManyToOne(optional = false, fetch = FetchType.EAGER)
+    @JoinColumn(name = "inventory_id", nullable = false)
+    private Inventory inventoryBatch;
+
     @Column(nullable = false)
     private Integer quantity;
 
@@ -33,6 +39,9 @@ public class Sale {
 
     public Product getProduct() { return product; }
     public void setProduct(Product product) { this.product = product; }
+
+    public Inventory getInventoryBatch() { return inventoryBatch; }
+    public void setInventoryBatch(Inventory inventoryBatch) { this.inventoryBatch = inventoryBatch; }
 
     public Integer getQuantity() { return quantity; }
     public void setQuantity(Integer quantity) { this.quantity = quantity; }

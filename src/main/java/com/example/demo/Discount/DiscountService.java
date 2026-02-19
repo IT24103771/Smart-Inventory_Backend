@@ -18,6 +18,7 @@ public class DiscountService {
         this.productRepository = productRepository;
     }
 
+    // ✅ CREATE
     public DiscountResponse create(CreateDiscountRequest req) {
 
         Product product = productRepository.findById(req.getProductId())
@@ -32,10 +33,10 @@ public class DiscountService {
         discount.setActive(req.getActive() != null ? req.getActive() : true);
 
         Discount saved = discountRepository.save(discount);
-
         return toResponse(saved);
     }
 
+    // ✅ GET ALL
     public List<DiscountResponse> getAll() {
         return discountRepository.findAllWithProductOrderByCreatedAtDesc()
                 .stream()
@@ -43,6 +44,7 @@ public class DiscountService {
                 .toList();
     }
 
+    // ✅ GET ACTIVE
     public List<DiscountResponse> getActive() {
         return discountRepository.findActiveWithProduct()
                 .stream()
@@ -50,21 +52,55 @@ public class DiscountService {
                 .toList();
     }
 
+    // ✅ SET ACTIVE / INACTIVE
     public DiscountResponse setActive(Long discountId, boolean active) {
         Discount discount = discountRepository.findById(discountId)
                 .orElseThrow(() -> new RuntimeException("Discount not found: " + discountId));
 
         discount.setActive(active);
         Discount saved = discountRepository.save(discount);
-
         return toResponse(saved);
+    }
+
+    // ✅ UPDATE (EDIT) — matches controller: PUT /api/discounts/{id}
+    public DiscountResponse update(Long id, CreateDiscountRequest req) {
+        Discount discount = discountRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Discount not found: " + id));
+
+        // If productId is provided, allow changing the product link
+        if (req.getProductId() != null) {
+            Product product = productRepository.findById(req.getProductId())
+                    .orElseThrow(() ->
+                            new RuntimeException("Product not found: " + req.getProductId())
+                    );
+            discount.setProduct(product);
+        }
+
+        discount.setDiscountPercent(req.getDiscountPercent());
+        discount.setNote(req.getNote());
+
+        // if null, keep previous active value (don’t overwrite)
+        if (req.getActive() != null) {
+            discount.setActive(req.getActive());
+        }
+
+        Discount saved = discountRepository.save(discount);
+        return toResponse(saved);
+    }
+
+    // ✅ DELETE — matches controller: DELETE /api/discounts/{id}
+    public void delete(Long id) {
+        if (!discountRepository.existsById(id)) {
+            throw new RuntimeException("Discount not found: " + id);
+        }
+        discountRepository.deleteById(id);
     }
 
     private DiscountResponse toResponse(Discount d) {
         return new DiscountResponse(
                 d.getId(),
                 d.getProduct().getId(),
-                d.getProduct().getName(), // ⚠️ change if your Product field is not "name"
+                d.getProduct().getName(), // change if your Product field isn't "name"
                 d.getDiscountPercent(),
                 d.getNote(),
                 d.getActive(),

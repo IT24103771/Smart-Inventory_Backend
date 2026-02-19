@@ -1,6 +1,5 @@
 package com.example.demo.Inventory;
 
-
 import com.example.demo.Products.Product;
 import jakarta.persistence.*;
 
@@ -8,7 +7,15 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "inventory")
+@Table(
+        name = "inventory",
+        uniqueConstraints = {
+                @UniqueConstraint(
+                        name = "uk_product_batch",
+                        columnNames = {"product_id", "batch_number"}
+                )
+        }
+)
 public class Inventory {
 
     @Id

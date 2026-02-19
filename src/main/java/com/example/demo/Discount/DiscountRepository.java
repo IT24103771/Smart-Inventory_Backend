@@ -12,4 +12,8 @@ public interface DiscountRepository extends JpaRepository<Discount, Long> {
 
     @Query("SELECT d FROM Discount d JOIN FETCH d.product p WHERE d.active = true ORDER BY d.createdAt DESC")
     List<Discount> findActiveWithProduct();
+
+    @Query("SELECT COUNT(d) FROM Discount d WHERE d.active = true")
+    Long countActiveDiscounts();
+
 }

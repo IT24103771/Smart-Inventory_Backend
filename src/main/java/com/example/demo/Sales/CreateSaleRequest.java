@@ -10,6 +10,9 @@ public class CreateSaleRequest {
     private Long productId;
 
     @NotNull
+    private Long batchId;   // ✅ NEW: which batch is being sold
+
+    @NotNull
     @Min(1)
     private Integer quantity;
 
@@ -18,6 +21,9 @@ public class CreateSaleRequest {
 
     public Long getProductId() { return productId; }
     public void setProductId(Long productId) { this.productId = productId; }
+
+    public Long getBatchId() { return batchId; }
+    public void setBatchId(Long batchId) { this.batchId = batchId; }
 
     public Integer getQuantity() { return quantity; }
     public void setQuantity(Integer quantity) { this.quantity = quantity; }
