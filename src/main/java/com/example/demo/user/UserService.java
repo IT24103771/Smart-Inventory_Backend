@@ -19,7 +19,14 @@ public class UserService {
     }
 
     public Optional<User> authenticate(String username, String password) {
-        Optional<User> user = userRepository.findByUsername(username);
+        if (username == null || username.trim().isEmpty()) {
+            return Optional.empty();
+        }
+        if (password == null || password.isEmpty()) {
+            return Optional.empty();
+        }
+
+        Optional<User> user = userRepository.findByUsername(username.trim());
 
         if (user.isPresent()
                 && "ACTIVE".equalsIgnoreCase(user.get().getStatus())
@@ -39,10 +46,16 @@ public class UserService {
     }
 
     public User createUser(User user) {
+        validateUserForCreate(user);
+
+        user.setUsername(user.getUsername().trim());
+        user.setName(user.getName().trim());
         user.setPassword(passwordEncoder.encode(user.getPassword()));
 
         if (user.getStatus() == null || user.getStatus().isBlank()) {
             user.setStatus("ACTIVE");
+        } else {
+            validateStatus(user.getStatus());
         }
 
         return userRepository.save(user);
@@ -54,16 +67,22 @@ public class UserService {
 
     public Optional<User> updateUser(Long id, User userDetails) {
         return userRepository.findById(id).map(user -> {
-            user.setName(userDetails.getName());
-            user.setUsername(userDetails.getUsername());
+            validateUserForUpdate(userDetails, user);
+
+            user.setName(userDetails.getName().trim());
+            user.setUsername(userDetails.getUsername().trim());
             user.setDoj(userDetails.getDoj());
             user.setRole(userDetails.getRole());
 
             if (userDetails.getStatus() != null && !userDetails.getStatus().isBlank()) {
-                user.setStatus(userDetails.getStatus());
+                validateStatus(userDetails.getStatus());
+                user.setStatus(userDetails.getStatus().trim().toUpperCase());
             }
 
             if (userDetails.getPassword() != null && !userDetails.getPassword().isEmpty()) {
+                if (userDetails.getPassword().length() < 6) {
+                    throw new RuntimeException("Password must be at least 6 characters.");
+                }
                 user.setPassword(passwordEncoder.encode(userDetails.getPassword()));
             }
 
@@ -77,5 +96,89 @@ public class UserService {
             return true;
         }
         return false;
+    }
+
+    // ── Validation helpers ──────────────────────────────────────
+
+    private void validateUserForCreate(User user) {
+        // Username
+        if (user.getUsername() == null || user.getUsername().trim().isEmpty()) {
+            throw new RuntimeException("Username is required.");
+        }
+        String username = user.getUsername().trim();
+        if (username.length() < 3 || username.length() > 50) {
+            throw new RuntimeException("Username must be between 3 and 50 characters.");
+        }
+        if (!username.matches("^[a-zA-Z0-9._@]+$")) {
+            throw new RuntimeException("Username may only contain letters, digits, dots, underscores, and @.");
+        }
+
+        // Check for duplicate username
+        if (userRepository.findByUsername(username).isPresent()) {
+            throw new RuntimeException("Username '" + username + "' is already taken.");
+        }
+
+        // Password
+        if (user.getPassword() == null || user.getPassword().isEmpty()) {
+            throw new RuntimeException("Password is required.");
+        }
+        if (user.getPassword().length() < 6) {
+            throw new RuntimeException("Password must be at least 6 characters.");
+        }
+
+        // Name
+        if (user.getName() == null || user.getName().trim().isEmpty()) {
+            throw new RuntimeException("Full name is required.");
+        }
+        if (user.getName().trim().length() < 2) {
+            throw new RuntimeException("Full name must be at least 2 characters.");
+        }
+
+        // Role
+        if (user.getRole() == null) {
+            throw new RuntimeException("Role is required.");
+        }
+    }
+
+    private void validateUserForUpdate(User newData, User existing) {
+        // Username
+        if (newData.getUsername() == null || newData.getUsername().trim().isEmpty()) {
+            throw new RuntimeException("Username is required.");
+        }
+        String username = newData.getUsername().trim();
+        if (username.length() < 3 || username.length() > 50) {
+            throw new RuntimeException("Username must be between 3 and 50 characters.");
+        }
+        if (!username.matches("^[a-zA-Z0-9._@]+$")) {
+            throw new RuntimeException("Username may only contain letters, digits, dots, underscores, and @.");
+        }
+
+        // Check for duplicate username (only if changed)
+        if (!existing.getUsername().equalsIgnoreCase(username)) {
+            if (userRepository.findByUsername(username).isPresent()) {
+                throw new RuntimeException("Username '" + username + "' is already taken.");
+            }
+        }
+
+        // Name
+        if (newData.getName() == null || newData.getName().trim().isEmpty()) {
+            throw new RuntimeException("Full name is required.");
+        }
+        if (newData.getName().trim().length() < 2) {
+            throw new RuntimeException("Full name must be at least 2 characters.");
+        }
+
+        // Role
+        if (newData.getRole() == null) {
+            throw new RuntimeException("Role is required.");
+        }
+    }
+
+    private void validateStatus(String status) {
+        if (status == null || status.isBlank()) return;
+        String normalized = status.trim().toUpperCase();
+        if (!"ACTIVE".equals(normalized) && !"INACTIVE".equals(normalized)) {
+            throw new RuntimeException("Status must be ACTIVE or INACTIVE.");
+        }
     }
 }

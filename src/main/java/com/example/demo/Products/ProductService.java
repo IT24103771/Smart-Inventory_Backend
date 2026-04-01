@@ -15,13 +15,21 @@ public class ProductService {
     @Autowired
     private InventoryRepository inventoryRepository;
 
-    public Product save(Product p) {
-        validateProduct(p);
+    /**
+     * Create a new product from validated DTO.
+     */
+    public Product save(CreateProductRequest req) {
+        validateProductRequest(req);
 
-        p.setName(p.getName().trim());
-        p.setCategory(p.getCategory().trim());
-        p.setBrand(p.getBrand().trim());
+        Product p = new Product();
+        mapDtoToEntity(req, p);
+        return repo.save(p);
+    }
 
+    /**
+     * Overload kept for internal use (e.g. saving existing entity).
+     */
+    public Product saveEntity(Product p) {
         return repo.save(p);
     }
 
@@ -38,16 +46,14 @@ public class ProductService {
         return inventoryRepository.getTotalQuantityByProductId(productId);
     }
 
-    public Product update(Long id, Product newData) {
+    /**
+     * Update an existing product from validated DTO.
+     */
+    public Product update(Long id, CreateProductRequest req) {
         Product existing = getById(id);
-
-        existing.setName(newData.getName());
-        existing.setCategory(newData.getCategory());
-        existing.setBrand(newData.getBrand());
-        existing.setPrice(newData.getPrice());
-        existing.setReorderLevel(newData.getReorderLevel());
-
-        return save(existing);
+        validateProductRequest(req);
+        mapDtoToEntity(req, existing);
+        return repo.save(existing);
     }
 
     public void delete(Long id) {
@@ -57,20 +63,53 @@ public class ProductService {
         repo.deleteById(id);
     }
 
-    private void validateProduct(Product p) {
-        if (p.getName() == null || p.getName().trim().isEmpty()) {
+    /**
+     * Maps DTO fields to entity, trimming all string values.
+     */
+    private void mapDtoToEntity(CreateProductRequest req, Product p) {
+        p.setProductName(req.getProductName().trim());
+        p.setMainCategory(req.getMainCategory().trim());
+        p.setSubCategory(req.getSubCategory().trim());
+        p.setItemType(req.getItemType().trim());
+        p.setSupplier(req.getSupplier().trim());
+        p.setCostPrice(req.getCostPrice());
+        p.setSellingPrice(req.getSellingPrice());
+        p.setImageUrl(req.getImageUrl() != null ? req.getImageUrl().trim() : null);
+        p.setReorderLevel(req.getReorderLevel());
+    }
+
+    /**
+     * Service-level validation as defense-in-depth (in addition to DTO annotations).
+     */
+    private void validateProductRequest(CreateProductRequest req) {
+        if (req.getProductName() == null || req.getProductName().trim().isEmpty()) {
             throw new RuntimeException("Product name is required");
         }
-        if (p.getCategory() == null || p.getCategory().trim().isEmpty()) {
-            throw new RuntimeException("Category is required");
+        if (req.getProductName().trim().length() < 3) {
+            throw new RuntimeException("Product name must be at least 3 characters");
         }
-        if (p.getBrand() == null || p.getBrand().trim().isEmpty()) {
-            throw new RuntimeException("Brand is required");
+        if (req.getMainCategory() == null || req.getMainCategory().trim().isEmpty()) {
+            throw new RuntimeException("Main category is required");
         }
-        if (p.getPrice() <= 0) {
-            throw new RuntimeException("Price must be greater than 0");
+        if (req.getSubCategory() == null || req.getSubCategory().trim().isEmpty()) {
+            throw new RuntimeException("Sub category is required");
         }
-        if (p.getReorderLevel() < 0) {
+        if (req.getItemType() == null || req.getItemType().trim().isEmpty()) {
+            throw new RuntimeException("Item type is required");
+        }
+        if (req.getSupplier() == null || req.getSupplier().trim().isEmpty()) {
+            throw new RuntimeException("Supplier is required");
+        }
+        if (req.getCostPrice() < 0) {
+            throw new RuntimeException("Cost price must be 0 or more");
+        }
+        if (req.getSellingPrice() <= 0) {
+            throw new RuntimeException("Selling price must be greater than 0");
+        }
+        if (req.getCostPrice() > req.getSellingPrice()) {
+            throw new RuntimeException("Cost price cannot be greater than selling price");
+        }
+        if (req.getReorderLevel() < 0) {
             throw new RuntimeException("Reorder level must be 0 or more");
         }
     }

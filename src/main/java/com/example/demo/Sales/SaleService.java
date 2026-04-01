@@ -25,9 +25,20 @@ public class SaleService {
         this.inventoryRepository = inventoryRepository;
     }
 
-    // ✅ CREATE
     @Transactional
     public SaleResponse create(CreateSaleRequest req) {
+
+        if (req.getQuantity() == null || req.getQuantity() < 1) {
+            throw new RuntimeException("Sale quantity must be at least 1.");
+        }
+
+        if (req.getSaleDate() == null) {
+            throw new RuntimeException("Sale date is required.");
+        }
+
+        if (req.getSaleDate().isAfter(LocalDate.now())) {
+            throw new RuntimeException("Sale date cannot be in the future.");
+        }
 
         Product product = productRepository.findById(req.getProductId())
                 .orElseThrow(() -> new RuntimeException("Product not found: " + req.getProductId()));
@@ -35,12 +46,10 @@ public class SaleService {
         Inventory batch = inventoryRepository.findById(req.getBatchId())
                 .orElseThrow(() -> new RuntimeException("Batch not found: " + req.getBatchId()));
 
-        // Ensure batch belongs to the selected product
-        if (!batch.getProduct().getId().equals(product.getId())) {
+        if (!batch.getProduct().getProductId().equals(product.getProductId())) {
             throw new RuntimeException("Selected batch does not belong to selected product.");
         }
 
-        // Optional: block expired batch sales
         LocalDate today = LocalDate.now();
         if (batch.getExpiryDate() != null && batch.getExpiryDate().isBefore(today)) {
             throw new RuntimeException("Cannot sell from an expired batch.");
@@ -52,11 +61,9 @@ public class SaleService {
                     + batch.getQuantity() + ", Requested: " + qty);
         }
 
-        // Deduct stock
         batch.setQuantity(batch.getQuantity() - qty);
         inventoryRepository.save(batch);
 
-        // Save sale record
         Sale sale = new Sale();
         sale.setProduct(product);
         sale.setInventoryBatch(batch);
@@ -74,10 +81,20 @@ public class SaleService {
                 .toList();
     }
 
-
-    // ✅ UPDATE (restore old batch, deduct new batch)
     @Transactional
     public SaleResponse update(Long id, CreateSaleRequest req) {
+
+        if (req.getQuantity() == null || req.getQuantity() < 1) {
+            throw new RuntimeException("Sale quantity must be at least 1.");
+        }
+
+        if (req.getSaleDate() == null) {
+            throw new RuntimeException("Sale date is required.");
+        }
+
+        if (req.getSaleDate().isAfter(LocalDate.now())) {
+            throw new RuntimeException("Sale date cannot be in the future.");
+        }
 
         Sale sale = saleRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Sale not found: " + id));
@@ -88,16 +105,14 @@ public class SaleService {
         Inventory newBatch = inventoryRepository.findById(req.getBatchId())
                 .orElseThrow(() -> new RuntimeException("Batch not found: " + req.getBatchId()));
 
-        if (!newBatch.getProduct().getId().equals(newProduct.getId())) {
+        if (!newBatch.getProduct().getProductId().equals(newProduct.getProductId())) {
             throw new RuntimeException("Selected batch does not belong to selected product.");
         }
 
-        // restore previous stock
         Inventory oldBatch = sale.getInventoryBatch();
         oldBatch.setQuantity(oldBatch.getQuantity() + sale.getQuantity());
         inventoryRepository.save(oldBatch);
 
-        // deduct from new batch
         int newQty = req.getQuantity();
         if (newBatch.getQuantity() < newQty) {
             throw new RuntimeException("Not enough stock in selected batch. Available: "
@@ -107,7 +122,6 @@ public class SaleService {
         newBatch.setQuantity(newBatch.getQuantity() - newQty);
         inventoryRepository.save(newBatch);
 
-        // update sale data
         sale.setProduct(newProduct);
         sale.setInventoryBatch(newBatch);
         sale.setQuantity(newQty);
@@ -116,7 +130,6 @@ public class SaleService {
         return toResponse(saleRepository.save(sale));
     }
 
-    // ✅ DELETE (restore stock back to batch)
     @Transactional
     public void delete(Long id) {
 
@@ -133,8 +146,8 @@ public class SaleService {
     private SaleResponse toResponse(Sale s) {
         return new SaleResponse(
                 s.getId(),
-                s.getProduct().getId(),
-                s.getProduct().getName(),
+                s.getProduct().getProductId(),
+                s.getProduct().getProductName(),
                 s.getInventoryBatch().getId(),
                 s.getInventoryBatch().getBatchNumber(),
                 s.getInventoryBatch().getExpiryDate(),
@@ -143,5 +156,4 @@ public class SaleService {
                 s.getCreatedAt()
         );
     }
-
 }

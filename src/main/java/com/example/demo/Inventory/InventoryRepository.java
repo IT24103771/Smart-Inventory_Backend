@@ -14,7 +14,7 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
     @Query("""
             SELECT i FROM Inventory i
             JOIN FETCH i.product
-            WHERE i.product.id = :productId
+            WHERE i.product.productId = :productId
             ORDER BY i.expiryDate ASC
            """)
     List<Inventory> findByProductIdOrderByExpiryAsc(@Param("productId") Long productId);
@@ -22,15 +22,22 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
     @Query("""
             SELECT i FROM Inventory i
             JOIN FETCH i.product
-            WHERE i.product.id = :productId
+            WHERE i.product.productId = :productId
               AND i.quantity > 0
             ORDER BY i.expiryDate ASC
            """)
     List<Inventory> findAvailableBatchesByProductId(@Param("productId") Long productId);
 
-    boolean existsByProductIdAndBatchNumber(Long productId, String batchNumber);
+    @Query("""
+            SELECT COUNT(i) > 0
+            FROM Inventory i
+            WHERE i.product.productId = :productId
+              AND LOWER(i.batchNumber) = LOWER(:batchNumber)
+           """)
+    boolean existsByProductIdAndBatchNumber(@Param("productId") Long productId,
+                                            @Param("batchNumber") String batchNumber);
 
-    @Query("SELECT COALESCE(SUM(i.quantity),0) FROM Inventory i WHERE i.product.id = :productId")
+    @Query("SELECT COALESCE(SUM(i.quantity),0) FROM Inventory i WHERE i.product.productId = :productId")
     Integer getTotalQuantityByProductId(@Param("productId") Long productId);
 
     @Query("SELECT COALESCE(SUM(i.quantity),0) FROM Inventory i")
@@ -57,5 +64,4 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
        """)
     Long countExpiringSoonBatches(@Param("today") java.time.LocalDate today,
                                   @Param("soon") java.time.LocalDate soon);
-    //sadasdasdasdasd
 }

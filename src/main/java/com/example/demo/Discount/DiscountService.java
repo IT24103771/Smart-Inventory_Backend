@@ -107,8 +107,8 @@ public class DiscountService {
     private DiscountResponse toResponse(Discount d) {
         return new DiscountResponse(
                 d.getId(),
-                d.getProduct().getId(),
-                d.getProduct().getName(),
+                d.getProduct().getProductId(),
+                d.getProduct().getProductName(),
                 d.getDiscountPercent(),
                 d.getNote(),
                 d.getActive(),

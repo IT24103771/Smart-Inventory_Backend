@@ -1,47 +1,41 @@
 package com.example.demo.Products;
 
-import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
 
-@Entity
-@Table(name = "products")
-public class Product {
+public class CreateProductRequest {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long productId;
-
-    @Column(nullable = false)
+    @NotBlank(message = "Product name is required")
+    @Size(min = 3, max = 100, message = "Product name must be between 3 and 100 characters")
     private String productName;
 
-    @Column(nullable = false)
+    @NotBlank(message = "Main category is required")
+    @Size(min = 2, max = 100, message = "Main category must be between 2 and 100 characters")
     private String mainCategory;
 
-    @Column(nullable = false)
+    @NotBlank(message = "Sub category is required")
+    @Size(min = 2, max = 100, message = "Sub category must be between 2 and 100 characters")
     private String subCategory;
 
-    @Column(nullable = false)
+    @NotBlank(message = "Item type is required")
+    @Size(min = 2, max = 100, message = "Item type must be between 2 and 100 characters")
     private String itemType;
 
-    @Column(nullable = false)
+    @NotBlank(message = "Supplier is required")
+    @Size(min = 2, max = 100, message = "Supplier must be between 2 and 100 characters")
     private String supplier;
 
-    @Column(nullable = false)
+    @DecimalMin(value = "0.0", message = "Cost price must be 0 or more")
     private double costPrice;
 
-    @Column(nullable = false)
+    @DecimalMin(value = "0.01", message = "Selling price must be greater than 0")
     private double sellingPrice;
 
-    @Column(columnDefinition = "LONGTEXT")
     private String imageUrl;
 
-    @Column(nullable = false)
+    @Min(value = 0, message = "Reorder level must be 0 or more")
     private int reorderLevel;
 
-    public Product() {}
-
-    public Long getProductId() { return productId; }
-    public void setProductId(Long productId) { this.productId = productId; }
-
+    // Getters and Setters
     public String getProductName() { return productName; }
     public void setProductName(String productName) { this.productName = productName; }
 

@@ -38,6 +38,10 @@ public class InventoryService {
             throw new RuntimeException("Expiry date is required.");
         }
 
+        if (req.getExpiryDate().isBefore(LocalDate.now())) {
+            throw new RuntimeException("Expiry date must be today or in the future.");
+        }
+
         if (inventoryRepository.existsByProductIdAndBatchNumber(req.getProductId(), batchNo)) {
             throw new RuntimeException("This batch number already exists for the selected product.");
         }
@@ -86,8 +90,12 @@ public class InventoryService {
             throw new RuntimeException("Expiry date is required.");
         }
 
-        Long newProductId = product.getId();
-        boolean changedProduct = !inv.getProduct().getId().equals(newProductId);
+        if (req.getExpiryDate().isBefore(LocalDate.now())) {
+            throw new RuntimeException("Expiry date must be today or in the future.");
+        }
+
+        Long newProductId = product.getProductId();
+        boolean changedProduct = !inv.getProduct().getProductId().equals(newProductId);
         boolean changedBatch = !inv.getBatchNumber().equalsIgnoreCase(newBatchNo);
 
         if ((changedProduct || changedBatch)
@@ -162,8 +170,8 @@ public class InventoryService {
     private InventoryResponse toResponse(Inventory inv) {
         return new InventoryResponse(
                 inv.getId(),
-                inv.getProduct().getId(),
-                inv.getProduct().getName(),
+                inv.getProduct().getProductId(),
+                inv.getProduct().getProductName(),
                 inv.getBatchNumber(),
                 inv.getQuantity(),
                 inv.getExpiryDate(),

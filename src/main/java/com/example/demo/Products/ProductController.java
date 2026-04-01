@@ -1,5 +1,6 @@
 package com.example.demo.Products;
 
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -14,8 +15,8 @@ public class ProductController {
     private ProductService service;
 
     @PostMapping
-    public ResponseEntity<Product> create(@RequestBody Product product) {
-        return ResponseEntity.ok(service.save(product));
+    public ResponseEntity<Product> create(@Valid @RequestBody CreateProductRequest req) {
+        return ResponseEntity.ok(service.save(req));
     }
 
     @GetMapping
@@ -34,8 +35,8 @@ public class ProductController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Product> update(@PathVariable Long id, @RequestBody Product product) {
-        return ResponseEntity.ok(service.update(id, product));
+    public ResponseEntity<Product> update(@PathVariable Long id, @Valid @RequestBody CreateProductRequest req) {
+        return ResponseEntity.ok(service.update(id, req));
     }
 
     @DeleteMapping("/{id}")
