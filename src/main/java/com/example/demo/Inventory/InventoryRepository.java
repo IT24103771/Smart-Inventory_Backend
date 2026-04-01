@@ -8,11 +8,9 @@ import java.util.List;
 
 public interface InventoryRepository extends JpaRepository<Inventory, Long> {
 
-    // ✅ For inventory page listing (all batches with product info)
     @Query("SELECT i FROM Inventory i JOIN FETCH i.product ORDER BY i.expiryDate ASC")
     List<Inventory> findAllWithProductOrderByExpiryAsc();
 
-    // ✅ IMPORTANT: for Sales (all batches for a product, earliest expiry first)
     @Query("""
             SELECT i FROM Inventory i
             JOIN FETCH i.product
@@ -21,7 +19,6 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
            """)
     List<Inventory> findByProductIdOrderByExpiryAsc(@Param("productId") Long productId);
 
-    // ✅ Sales dropdown: only batches that have stock (> 0)
     @Query("""
             SELECT i FROM Inventory i
             JOIN FETCH i.product
@@ -31,12 +28,11 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
            """)
     List<Inventory> findAvailableBatchesByProductId(@Param("productId") Long productId);
 
-    // ✅ Prevent duplicate batch per product (Milk + B01 cannot repeat)
     boolean existsByProductIdAndBatchNumber(Long productId, String batchNumber);
 
-    // ✅ Optional: total available quantity for a product (helps validation)
     @Query("SELECT COALESCE(SUM(i.quantity),0) FROM Inventory i WHERE i.product.id = :productId")
     Integer getTotalQuantityByProductId(@Param("productId") Long productId);
+
     @Query("SELECT COALESCE(SUM(i.quantity),0) FROM Inventory i")
     Long getTotalStockQty();
 
@@ -61,5 +57,5 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
        """)
     Long countExpiringSoonBatches(@Param("today") java.time.LocalDate today,
                                   @Param("soon") java.time.LocalDate soon);
-
+    //sadasdasdasdasd
 }

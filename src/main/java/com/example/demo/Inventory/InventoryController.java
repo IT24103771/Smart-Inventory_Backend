@@ -1,13 +1,13 @@
 package com.example.demo.Inventory;
 
 import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/inventory")
-@CrossOrigin(origins = "http://localhost:3000")
 public class InventoryController {
 
     private final InventoryService inventoryService;
@@ -17,28 +17,29 @@ public class InventoryController {
     }
 
     @PostMapping
-    public InventoryResponse create(@Valid @RequestBody CreateInventoryRequest req) {
-        return inventoryService.create(req);
+    public ResponseEntity<InventoryResponse> create(@Valid @RequestBody CreateInventoryRequest req) {
+        return ResponseEntity.ok(inventoryService.create(req));
     }
 
     @GetMapping
-    public List<InventoryResponse> getAll() {
-        return inventoryService.getAll();
+    public ResponseEntity<List<InventoryResponse>> getAll() {
+        return ResponseEntity.ok(inventoryService.getAll());
     }
 
-    // ✅ NEW: for Sales page batch dropdown (only qty > 0)
     @GetMapping("/by-product/{productId}")
-    public List<InventoryResponse> getAvailableBatches(@PathVariable Long productId) {
-        return inventoryService.getAvailableBatches(productId);
+    public ResponseEntity<List<InventoryResponse>> getAvailableBatches(@PathVariable Long productId) {
+        return ResponseEntity.ok(inventoryService.getAvailableBatches(productId));
     }
 
     @PutMapping("/{id}")
-    public InventoryResponse update(@PathVariable Long id, @Valid @RequestBody CreateInventoryRequest req) {
-        return inventoryService.update(id, req);
+    public ResponseEntity<InventoryResponse> update(@PathVariable Long id,
+                                                    @Valid @RequestBody CreateInventoryRequest req) {
+        return ResponseEntity.ok(inventoryService.update(id, req));
     }
 
     @DeleteMapping("/{id}")
-    public void delete(@PathVariable Long id) {
+    public ResponseEntity<String> delete(@PathVariable Long id) {
         inventoryService.delete(id);
+        return ResponseEntity.ok("Inventory batch deleted successfully");
     }
 }

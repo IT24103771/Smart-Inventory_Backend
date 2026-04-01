@@ -1,7 +1,6 @@
 package com.example.demo.Discount;
+
 import com.example.demo.Products.Product;
-
-
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
@@ -13,13 +12,12 @@ public class Discount {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Link discount -> product (many discounts can exist over time for one product)
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
     @Column(name = "discount_percent", nullable = false)
-    private Double discountPercent; // e.g. 10.0
+    private Double discountPercent;
 
     @Column(name = "note")
     private String note;
@@ -32,7 +30,6 @@ public class Discount {
 
     public Discount() {}
 
-    // getters & setters
     public Long getId() { return id; }
 
     public Product getProduct() { return product; }

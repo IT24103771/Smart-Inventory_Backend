@@ -1,4 +1,7 @@
 package com.example.demo.user;
 
-public class UserRole {
+public enum UserRole {
+    OWNER,
+    ADMIN,
+    STAFF
 }

@@ -1,6 +1,6 @@
 package com.example.demo.Products;
 
-
+import com.example.demo.Inventory.InventoryRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -12,22 +12,11 @@ public class ProductService {
     @Autowired
     private ProductRepository repo;
 
+    @Autowired
+    private InventoryRepository inventoryRepository;
+
     public Product save(Product p) {
-        if (p.getName() == null || p.getName().trim().isEmpty()) {
-            throw new RuntimeException("Product name is required");
-        }
-        if (p.getCategory() == null || p.getCategory().trim().isEmpty()) {
-            throw new RuntimeException("Category is required");
-        }
-        if (p.getBrand() == null || p.getBrand().trim().isEmpty()) {
-            throw new RuntimeException("Brand is required");
-        }
-        if (p.getPrice() <= 0) {
-            throw new RuntimeException("Price must be > 0");
-        }
-        if (p.getReorderLevel() < 0) {
-            throw new RuntimeException("Reorder level must be >= 0");
-        }
+        validateProduct(p);
 
         p.setName(p.getName().trim());
         p.setCategory(p.getCategory().trim());
@@ -41,7 +30,12 @@ public class ProductService {
     }
 
     public Product getById(Long id) {
-        return repo.findById(id).orElseThrow(() -> new RuntimeException("Product not found"));
+        return repo.findById(id)
+                .orElseThrow(() -> new RuntimeException("Product not found"));
+    }
+
+    public Integer getAvailableQuantity(Long productId) {
+        return inventoryRepository.getTotalQuantityByProductId(productId);
     }
 
     public Product update(Long id, Product newData) {
@@ -61,5 +55,23 @@ public class ProductService {
             throw new RuntimeException("Product not found");
         }
         repo.deleteById(id);
+    }
+
+    private void validateProduct(Product p) {
+        if (p.getName() == null || p.getName().trim().isEmpty()) {
+            throw new RuntimeException("Product name is required");
+        }
+        if (p.getCategory() == null || p.getCategory().trim().isEmpty()) {
+            throw new RuntimeException("Category is required");
+        }
+        if (p.getBrand() == null || p.getBrand().trim().isEmpty()) {
+            throw new RuntimeException("Brand is required");
+        }
+        if (p.getPrice() <= 0) {
+            throw new RuntimeException("Price must be greater than 0");
+        }
+        if (p.getReorderLevel() < 0) {
+            throw new RuntimeException("Reorder level must be 0 or more");
+        }
     }
 }

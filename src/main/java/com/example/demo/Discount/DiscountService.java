@@ -2,6 +2,7 @@ package com.example.demo.Discount;
 
 import com.example.demo.Products.Product;
 import com.example.demo.Products.ProductRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -18,25 +19,24 @@ public class DiscountService {
         this.productRepository = productRepository;
     }
 
-    // ✅ CREATE
     public DiscountResponse create(CreateDiscountRequest req) {
-
         Product product = productRepository.findById(req.getProductId())
                 .orElseThrow(() ->
                         new RuntimeException("Product not found: " + req.getProductId())
                 );
 
+        validateDiscount(req);
+
         Discount discount = new Discount();
         discount.setProduct(product);
         discount.setDiscountPercent(req.getDiscountPercent());
-        discount.setNote(req.getNote());
+        discount.setNote(req.getNote() != null ? req.getNote().trim() : null);
         discount.setActive(req.getActive() != null ? req.getActive() : true);
 
         Discount saved = discountRepository.save(discount);
         return toResponse(saved);
     }
 
-    // ✅ GET ALL
     public List<DiscountResponse> getAll() {
         return discountRepository.findAllWithProductOrderByCreatedAtDesc()
                 .stream()
@@ -44,7 +44,6 @@ public class DiscountService {
                 .toList();
     }
 
-    // ✅ GET ACTIVE
     public List<DiscountResponse> getActive() {
         return discountRepository.findActiveWithProduct()
                 .stream()
@@ -52,7 +51,6 @@ public class DiscountService {
                 .toList();
     }
 
-    // ✅ SET ACTIVE / INACTIVE
     public DiscountResponse setActive(Long discountId, boolean active) {
         Discount discount = discountRepository.findById(discountId)
                 .orElseThrow(() -> new RuntimeException("Discount not found: " + discountId));
@@ -62,24 +60,21 @@ public class DiscountService {
         return toResponse(saved);
     }
 
-    // ✅ UPDATE (EDIT) — matches controller: PUT /api/discounts/{id}
     public DiscountResponse update(Long id, CreateDiscountRequest req) {
         Discount discount = discountRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Discount not found: " + id));
 
-        // If productId is provided, allow changing the product link
-        if (req.getProductId() != null) {
-            Product product = productRepository.findById(req.getProductId())
-                    .orElseThrow(() ->
-                            new RuntimeException("Product not found: " + req.getProductId())
-                    );
-            discount.setProduct(product);
-        }
+        validateDiscount(req);
 
+        Product product = productRepository.findById(req.getProductId())
+                .orElseThrow(() ->
+                        new RuntimeException("Product not found: " + req.getProductId())
+                );
+
+        discount.setProduct(product);
         discount.setDiscountPercent(req.getDiscountPercent());
-        discount.setNote(req.getNote());
+        discount.setNote(req.getNote() != null ? req.getNote().trim() : null);
 
-        // if null, keep previous active value (don’t overwrite)
         if (req.getActive() != null) {
             discount.setActive(req.getActive());
         }
@@ -88,19 +83,32 @@ public class DiscountService {
         return toResponse(saved);
     }
 
-    // ✅ DELETE — matches controller: DELETE /api/discounts/{id}
     public void delete(Long id) {
         if (!discountRepository.existsById(id)) {
             throw new RuntimeException("Discount not found: " + id);
         }
-        discountRepository.deleteById(id);
+
+        try {
+            discountRepository.deleteById(id);
+        } catch (DataIntegrityViolationException e) {
+            throw new RuntimeException("Cannot delete this discount because it is used in other records.");
+        }
+    }
+
+    private void validateDiscount(CreateDiscountRequest req) {
+        if (req.getDiscountPercent() == null) {
+            throw new RuntimeException("Discount percent is required.");
+        }
+        if (req.getDiscountPercent() < 1 || req.getDiscountPercent() > 90) {
+            throw new RuntimeException("Discount percent must be between 1 and 90.");
+        }
     }
 
     private DiscountResponse toResponse(Discount d) {
         return new DiscountResponse(
                 d.getId(),
                 d.getProduct().getId(),
-                d.getProduct().getName(), // change if your Product field isn't "name"
+                d.getProduct().getName(),
                 d.getDiscountPercent(),
                 d.getNote(),
                 d.getActive(),

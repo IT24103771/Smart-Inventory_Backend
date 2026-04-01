@@ -18,14 +18,13 @@ public class MailService {
     }
 
     public MailResponse send(SendMailRequest req) {
-
         if (req == null) {
             throw new RuntimeException("Request body is missing");
         }
 
-        String fromEmail = req.getFromEmail() == null ? "" : req.getFromEmail().trim().toLowerCase();
-        if (fromEmail.isEmpty()) {
-            throw new RuntimeException("fromEmail is required");
+        String fromUsername = req.getFromUsername() == null ? "" : req.getFromUsername().trim();
+        if (fromUsername.isEmpty()) {
+            throw new RuntimeException("fromUsername is required");
         }
 
         if (req.getToUserId() == null) {
@@ -35,11 +34,15 @@ public class MailService {
         String subject = req.getSubject() == null ? "" : req.getSubject().trim();
         String body = req.getBody() == null ? "" : req.getBody().trim();
 
-        if (subject.isEmpty()) throw new RuntimeException("Subject is required");
-        if (body.isEmpty()) throw new RuntimeException("Message is required");
+        if (subject.isEmpty()) {
+            throw new RuntimeException("Subject is required");
+        }
+        if (body.isEmpty()) {
+            throw new RuntimeException("Message is required");
+        }
 
-        User from = userRepository.findByEmail(fromEmail)
-                .orElseThrow(() -> new RuntimeException("From user not found: " + fromEmail));
+        User from = userRepository.findByUsername(fromUsername)
+                .orElseThrow(() -> new RuntimeException("From user not found: " + fromUsername));
 
         User to = userRepository.findById(req.getToUserId())
                 .orElseThrow(() -> new RuntimeException("To user not found: " + req.getToUserId()));
@@ -56,17 +59,22 @@ public class MailService {
 
     public List<MailResponse> inbox(Long userId) {
         return mailRepository.findByToUserIdOrderByCreatedAtDesc(userId)
-                .stream().map(MailResponse::new).toList();
+                .stream()
+                .map(MailResponse::new)
+                .toList();
     }
 
     public List<MailResponse> sent(Long userId) {
         return mailRepository.findByFromUserIdOrderByCreatedAtDesc(userId)
-                .stream().map(MailResponse::new).toList();
+                .stream()
+                .map(MailResponse::new)
+                .toList();
     }
 
     public MailResponse markRead(Long mailId) {
         MailMessage m = mailRepository.findById(mailId)
                 .orElseThrow(() -> new RuntimeException("Mail not found: " + mailId));
+
         m.setStatus("READ");
         return new MailResponse(mailRepository.save(m));
     }

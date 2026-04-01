@@ -15,5 +15,4 @@ public interface DiscountRepository extends JpaRepository<Discount, Long> {
 
     @Query("SELECT COUNT(d) FROM Discount d WHERE d.active = true")
     Long countActiveDiscounts();
-
 }

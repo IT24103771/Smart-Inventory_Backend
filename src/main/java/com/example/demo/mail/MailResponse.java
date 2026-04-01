@@ -16,9 +16,9 @@ public class MailResponse {
     public MailResponse(MailMessage m) {
         this.id = m.getId();
         this.fromUserId = m.getFromUser().getId();
-        this.fromName = m.getFromUser().getFullName();
+        this.fromName = m.getFromUser().getName();
         this.toUserId = m.getToUser().getId();
-        this.toName = m.getToUser().getFullName();
+        this.toName = m.getToUser().getName();
         this.subject = m.getSubject();
         this.body = m.getBody();
         this.status = m.getStatus();

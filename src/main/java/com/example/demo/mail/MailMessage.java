@@ -2,6 +2,7 @@ package com.example.demo.mail;
 
 import com.example.demo.user.User;
 import jakarta.persistence.*;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -9,13 +10,15 @@ import java.time.LocalDateTime;
 public class MailMessage {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(optional = false)
+    @JoinColumn(name = "from_user_id", nullable = false)
     private User fromUser;
 
     @ManyToOne(optional = false)
+    @JoinColumn(name = "to_user_id", nullable = false)
     private User toUser;
 
     @Column(nullable = false)
@@ -37,6 +40,7 @@ public class MailMessage {
     }
 
     public Long getId() { return id; }
+
     public User getFromUser() { return fromUser; }
     public void setFromUser(User fromUser) { this.fromUser = fromUser; }
 

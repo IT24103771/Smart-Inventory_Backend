@@ -1,20 +1,51 @@
 package com.example.demo.mail;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
 public class SendMailRequest {
-    private String fromEmail;
+
+    @NotBlank
+    private String fromUsername;
+
+    @NotNull
     private Long toUserId;
+
+    @NotBlank
     private String subject;
+
+    @NotBlank
     private String body;
 
-    public String getFromEmail() { return fromEmail; }
-    public void setFromEmail(String fromEmail) { this.fromEmail = fromEmail; }
+    public String getFromUsername() {
+        return fromUsername;
+    }
 
-    public Long getToUserId() { return toUserId; }
-    public void setToUserId(Long toUserId) { this.toUserId = toUserId; }
+    public void setFromUsername(String fromUsername) {
+        this.fromUsername = fromUsername;
+    }
 
-    public String getSubject() { return subject; }
-    public void setSubject(String subject) { this.subject = subject; }
+    public Long getToUserId() {
+        return toUserId;
+    }
 
-    public String getBody() { return body; }
-    public void setBody(String body) { this.body = body; }
+    public void setToUserId(Long toUserId) {
+        this.toUserId = toUserId;
+    }
+
+    public String getSubject() {
+        return subject;
+    }
+
+    public void setSubject(String subject) {
+        this.subject = subject;
+    }
+
+    public String getBody() {
+        return body;
+    }
+
+    public void setBody(String body) {
+        this.body = body;
+    }
 }
