@@ -1,5 +1,7 @@
 package com.example.demo.Sales;
 
+import com.example.demo.Discount.Discount;
+import com.example.demo.Discount.DiscountRepository;
 import com.example.demo.Inventory.Inventory;
 import com.example.demo.Inventory.InventoryRepository;
 import com.example.demo.Products.Product;
@@ -9,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class SaleService {
@@ -16,84 +19,18 @@ public class SaleService {
     private final SaleRepository saleRepository;
     private final ProductRepository productRepository;
     private final InventoryRepository inventoryRepository;
-    private final com.example.demo.Discount.DiscountRepository discountRepository;
+    private final DiscountRepository discountRepository;
 
-    public SaleService(SaleRepository saleRepository,
-                       ProductRepository productRepository,
-                       InventoryRepository inventoryRepository,
-                       com.example.demo.Discount.DiscountRepository discountRepository) {
+    public SaleService(
+            SaleRepository saleRepository,
+            ProductRepository productRepository,
+            InventoryRepository inventoryRepository,
+            DiscountRepository discountRepository
+    ) {
         this.saleRepository = saleRepository;
         this.productRepository = productRepository;
         this.inventoryRepository = inventoryRepository;
         this.discountRepository = discountRepository;
-    }
-
-    @Transactional
-    public SaleResponse create(CreateSaleRequest req) {
-
-        if (req.getQuantity() == null || req.getQuantity() < 1) {
-            throw new RuntimeException("Sale quantity must be at least 1.");
-        }
-
-        if (req.getSaleDate() == null) {
-            throw new RuntimeException("Sale date is required.");
-        }
-
-        if (req.getSaleDate().isAfter(LocalDate.now())) {
-            throw new RuntimeException("Sale date cannot be in the future.");
-        }
-
-        Product product = productRepository.findById(req.getProductId())
-                .orElseThrow(() -> new RuntimeException("Product not found: " + req.getProductId()));
-
-        Inventory batch = inventoryRepository.findById(req.getBatchId())
-                .orElseThrow(() -> new RuntimeException("Batch not found: " + req.getBatchId()));
-
-        if (!batch.getProduct().getProductId().equals(product.getProductId())) {
-            throw new RuntimeException("Selected batch does not belong to selected product.");
-        }
-
-        LocalDate today = LocalDate.now();
-        if (batch.getExpiryDate() != null && batch.getExpiryDate().isBefore(today)) {
-            throw new RuntimeException("Cannot sell from an expired batch.");
-        }
-
-        int qty = req.getQuantity();
-        if (batch.getQuantity() < qty) {
-            throw new RuntimeException("Not enough stock in selected batch. Available: "
-                    + batch.getQuantity() + ", Requested: " + qty);
-        }
-
-        batch.setQuantity(batch.getQuantity() - qty);
-        inventoryRepository.save(batch);
-
-        Sale sale = new Sale();
-        sale.setProduct(product);
-        sale.setInventoryBatch(batch);
-        sale.setQuantity(qty);
-        sale.setSaleDate(req.getSaleDate());
-
-        // Price & Discount Calculation
-        Double originalPrice = product.getSellingPrice();
-        if (originalPrice == null) originalPrice = 0.0;
-        
-        java.util.Optional<com.example.demo.Discount.Discount> activeDiscount = discountRepository.findActiveByProductIdAndBatchId(product.getProductId(), batch.getId());
-        
-        Double discountPct = 0.0;
-        if (activeDiscount.isPresent()) {
-            discountPct = activeDiscount.get().getDiscountPercent();
-        }
-        
-        Double discountedPrice = originalPrice * (1.0 - (discountPct / 100.0));
-        Double totalAmt = discountedPrice * qty;
-        
-        sale.setOriginalUnitPrice(originalPrice);
-        sale.setDiscountPercent(discountPct);
-        sale.setDiscountedUnitPrice(discountedPrice);
-        sale.setTotalAmount(totalAmt);
-
-        Sale saved = saleRepository.save(sale);
-        return toResponse(saved);
     }
 
     public List<SaleResponse> getAll() {
@@ -105,20 +42,9 @@ public class SaleService {
 
     @Transactional
     public SaleResponse update(Long id, CreateSaleRequest req) {
+        validateRequest(req);
 
-        if (req.getQuantity() == null || req.getQuantity() < 1) {
-            throw new RuntimeException("Sale quantity must be at least 1.");
-        }
-
-        if (req.getSaleDate() == null) {
-            throw new RuntimeException("Sale date is required.");
-        }
-
-        if (req.getSaleDate().isAfter(LocalDate.now())) {
-            throw new RuntimeException("Sale date cannot be in the future.");
-        }
-
-        Sale sale = saleRepository.findById(id)
+        Sale existingSale = saleRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Sale not found: " + id));
 
         Product newProduct = productRepository.findById(req.getProductId())
@@ -127,53 +53,31 @@ public class SaleService {
         Inventory newBatch = inventoryRepository.findById(req.getBatchId())
                 .orElseThrow(() -> new RuntimeException("Batch not found: " + req.getBatchId()));
 
-        if (!newBatch.getProduct().getProductId().equals(newProduct.getProductId())) {
-            throw new RuntimeException("Selected batch does not belong to selected product.");
-        }
+        validateBatchBelongsToProduct(newProduct, newBatch);
+        validateBatchCanBeSold(newBatch, req.getSaleDate());
 
-        Inventory oldBatch = sale.getInventoryBatch();
-        oldBatch.setQuantity(oldBatch.getQuantity() + sale.getQuantity());
+        Inventory oldBatch = existingSale.getInventoryBatch();
+        oldBatch.setQuantity(oldBatch.getQuantity() + existingSale.getQuantity());
         inventoryRepository.save(oldBatch);
 
-        int newQty = req.getQuantity();
-        if (newBatch.getQuantity() < newQty) {
-            throw new RuntimeException("Not enough stock in selected batch. Available: "
-                    + newBatch.getQuantity() + ", Requested: " + newQty);
-        }
+        validateStockAvailable(newBatch, req.getQuantity());
 
-        newBatch.setQuantity(newBatch.getQuantity() - newQty);
+        newBatch.setQuantity(newBatch.getQuantity() - req.getQuantity());
         inventoryRepository.save(newBatch);
 
-        sale.setProduct(newProduct);
-        sale.setInventoryBatch(newBatch);
-        sale.setQuantity(newQty);
-        sale.setSaleDate(req.getSaleDate());
+        existingSale.setProduct(newProduct);
+        existingSale.setInventoryBatch(newBatch);
+        existingSale.setQuantity(req.getQuantity());
+        existingSale.setSaleDate(req.getSaleDate());
 
-        // Price & Discount Calculation
-        Double originalPrice = newProduct.getSellingPrice();
-        if (originalPrice == null) originalPrice = 0.0;
-        
-        java.util.Optional<com.example.demo.Discount.Discount> activeDiscount = discountRepository.findActiveByProductIdAndBatchId(newProduct.getProductId(), newBatch.getId());
-        
-        Double discountPct = 0.0;
-        if (activeDiscount.isPresent()) {
-            discountPct = activeDiscount.get().getDiscountPercent();
-        }
-        
-        Double discountedPrice = originalPrice * (1.0 - (discountPct / 100.0));
-        Double totalAmt = discountedPrice * newQty;
-        
-        sale.setOriginalUnitPrice(originalPrice);
-        sale.setDiscountPercent(discountPct);
-        sale.setDiscountedUnitPrice(discountedPrice);
-        sale.setTotalAmount(totalAmt);
+        applyPricingAndDiscount(existingSale, newProduct, newBatch, req.getQuantity());
 
-        return toResponse(saleRepository.save(sale));
+        Sale saved = saleRepository.save(existingSale);
+        return toResponse(saved);
     }
 
     @Transactional
     public void delete(Long id) {
-
         Sale sale = saleRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Sale not found: " + id));
 
@@ -184,29 +88,104 @@ public class SaleService {
         saleRepository.deleteById(id);
     }
 
-    private SaleResponse toResponse(Sale s) {
-        
-        String dNote = null;
-        if (s.getDiscountPercent() != null && s.getDiscountPercent() > 0) {
-            java.util.Optional<com.example.demo.Discount.Discount> d = discountRepository.findActiveByProductIdAndBatchId(s.getProduct().getProductId(), s.getInventoryBatch().getId());
-            if (d.isPresent()) dNote = d.get().getNote();
+    private void validateRequest(CreateSaleRequest req) {
+        if (req.getProductId() == null) {
+            throw new RuntimeException("Product is required.");
+        }
+        if (req.getBatchId() == null) {
+            throw new RuntimeException("Batch is required.");
+        }
+        if (req.getQuantity() == null || req.getQuantity() < 1) {
+            throw new RuntimeException("Sale quantity must be at least 1.");
+        }
+        if (req.getSaleDate() == null) {
+            throw new RuntimeException("Sale date is required.");
+        }
+        if (req.getSaleDate().isAfter(LocalDate.now())) {
+            throw new RuntimeException("Sale date cannot be in the future.");
+        }
+    }
+
+    private void validateBatchBelongsToProduct(Product product, Inventory batch) {
+        if (!batch.getProduct().getProductId().equals(product.getProductId())) {
+            throw new RuntimeException("Selected batch does not belong to selected product.");
+        }
+    }
+
+    private void validateBatchCanBeSold(Inventory batch, LocalDate saleDate) {
+        if (batch.getExpiryDate() == null) {
+            throw new RuntimeException("Selected batch does not have an expiry date.");
+        }
+        if (batch.getExpiryDate().isBefore(saleDate)) {
+            throw new RuntimeException("Cannot sell from an expired batch.");
+        }
+    }
+
+    private void validateStockAvailable(Inventory batch, Integer requestedQty) {
+        Integer available = batch.getQuantity() == null ? 0 : batch.getQuantity();
+        if (available < requestedQty) {
+            throw new RuntimeException(
+                    "Not enough stock in selected batch. Available: " + available + ", Requested: " + requestedQty
+            );
+        }
+    }
+
+    private void applyPricingAndDiscount(Sale sale, Product product, Inventory batch, Integer qty) {
+        double originalPrice = product.getSellingPrice() == 0 ? 0.0 : product.getSellingPrice();
+
+        Optional<Discount> activeDiscount =
+                discountRepository.findActiveByProductIdAndBatchId(product.getProductId(), batch.getId());
+
+        double discountPct = activeDiscount.map(Discount::getDiscountPercent).orElse(0.0);
+        double discountedPrice = originalPrice * (1.0 - (discountPct / 100.0));
+        double totalAmount = discountedPrice * qty;
+
+        sale.setOriginalUnitPrice(originalPrice);
+        sale.setDiscountPercent(discountPct);
+        sale.setDiscountedUnitPrice(discountedPrice);
+        sale.setTotalAmount(totalAmount);
+
+        // Snapshot discount note
+        sale.setDiscountNote(activeDiscount.map(Discount::getNote).orElse(null));
+    }
+
+    private SaleResponse toResponse(Sale sale) {
+        String discountNote = sale.getDiscountNote();
+
+        // Fallback to current discount if not snapshotted
+        if (discountNote == null && sale.getDiscountPercent() != null && sale.getDiscountPercent() > 0) {
+            discountNote = discountRepository
+                    .findActiveByProductIdAndBatchId(
+                            sale.getProduct().getProductId(),
+                            sale.getInventoryBatch().getId()
+                    )
+                    .map(Discount::getNote)
+                    .orElse(null);
         }
 
+        Long billId = sale.getSaleBill() != null ? sale.getSaleBill().getId() : null;
+        String billNumber = sale.getSaleBill() != null ? sale.getSaleBill().getBillNumber() : null;
+        String status = sale.getSaleBill() != null ? sale.getSaleBill().getStatus().name() : "FINALIZED";
+
         return new SaleResponse(
-                s.getId(),
-                s.getProduct().getProductId(),
-                s.getProduct().getProductName(),
-                s.getInventoryBatch().getId(),
-                s.getInventoryBatch().getBatchNumber(),
-                s.getInventoryBatch().getExpiryDate(),
-                s.getQuantity(),
-                s.getOriginalUnitPrice(),
-                s.getDiscountPercent(),
-                s.getDiscountedUnitPrice(),
-                s.getTotalAmount(),
-                dNote,
-                s.getSaleDate(),
-                s.getCreatedAt()
+                sale.getId(),
+                sale.getProduct().getProductId(),
+                sale.getProduct().getProductName(),
+                sale.getInventoryBatch().getId(),
+                sale.getInventoryBatch().getBatchNumber(),
+                sale.getInventoryBatch().getExpiryDate(),
+                sale.getQuantity(),
+                sale.getOriginalUnitPrice(),
+                sale.getDiscountPercent(),
+                sale.getDiscountedUnitPrice(),
+                sale.getTotalAmount(),
+                discountNote,
+                sale.getSaleDate(),
+                sale.getCreatedAt(),
+                sale.getCreatedBy(),
+                billId,
+                billNumber,
+                status
         );
     }
 }

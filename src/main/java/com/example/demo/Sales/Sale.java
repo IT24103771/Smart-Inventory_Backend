@@ -15,11 +15,14 @@ public class Sale {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "bill_id")
+    private SaleBill saleBill;
+
     @ManyToOne(optional = false, fetch = FetchType.EAGER)
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
-    // ✅ NEW: keep which batch was used
     @ManyToOne(optional = false, fetch = FetchType.EAGER)
     @JoinColumn(name = "inventory_id", nullable = false)
     private Inventory inventoryBatch;
@@ -39,15 +42,32 @@ public class Sale {
     @Column(name = "total_amount", nullable = false)
     private Double totalAmount = 0.0;
 
+    @Column(name = "discount_note")
+    private String discountNote;
+
     @Column(name = "sale_date", nullable = false)
-    private java.time.LocalDate saleDate;
+    private LocalDate saleDate;
+
+    @Column(name = "created_by", length = 100)
+    private String createdBy;
 
     @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt;
 
-    public Sale() {}
+    public Sale() {
+    }
+
+    @PrePersist
+    public void onCreate() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+    }
 
     public Long getId() { return id; }
+
+    public SaleBill getSaleBill() { return saleBill; }
+    public void setSaleBill(SaleBill saleBill) { this.saleBill = saleBill; }
 
     public Product getProduct() { return product; }
     public void setProduct(Product product) { this.product = product; }
@@ -70,8 +90,14 @@ public class Sale {
     public Double getTotalAmount() { return totalAmount; }
     public void setTotalAmount(Double totalAmount) { this.totalAmount = totalAmount; }
 
-    public java.time.LocalDate getSaleDate() { return saleDate; }
-    public void setSaleDate(java.time.LocalDate saleDate) { this.saleDate = saleDate; }
+    public String getDiscountNote() { return discountNote; }
+    public void setDiscountNote(String discountNote) { this.discountNote = discountNote; }
+
+    public LocalDate getSaleDate() { return saleDate; }
+    public void setSaleDate(LocalDate saleDate) { this.saleDate = saleDate; }
+
+    public String getCreatedBy() { return createdBy; }
+    public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

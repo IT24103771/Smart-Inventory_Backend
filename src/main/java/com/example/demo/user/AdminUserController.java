@@ -1,9 +1,11 @@
 package com.example.demo.user;
 
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin/users")
@@ -17,23 +19,16 @@ public class AdminUserController {
     }
 
     @GetMapping
-    public ResponseEntity<?> getAllUsers() {
-        try {
-            List<User> users = userService.getAllUsers();
-            return ResponseEntity.ok(users);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.internalServerError().body("Failed to load users: " + e.getMessage());
-        }
+    public ResponseEntity<List<User>> getAllUsers() {
+        return ResponseEntity.ok(userService.getAllUsers());
     }
 
     @PostMapping
-    public ResponseEntity<?> createUser(@RequestBody User user) {
+    public ResponseEntity<?> createUser(@Valid @RequestBody User user) {
         try {
             return ResponseEntity.ok(userService.createUser(user));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.badRequest().body("Failed to create user: " + e.getMessage());
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
     }
 
@@ -41,24 +36,32 @@ public class AdminUserController {
     public ResponseEntity<?> updateUser(@PathVariable Long id, @RequestBody User userDetails) {
         try {
             return userService.updateUser(id, userDetails)
-                    .map(ResponseEntity::ok)
+                    .<ResponseEntity<?>>map(ResponseEntity::ok)
                     .orElse(ResponseEntity.notFound().build());
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.badRequest().body("Failed to update user: " + e.getMessage());
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteUser(@PathVariable Long id) {
-        try {
+        return userService.getById(id).map(target -> {
+            if (target.getRole() == UserRole.OWNER) {
+                return ResponseEntity.status(403).body(Map.of("message", "Owner account cannot be deleted."));
+            }
             if (userService.deleteUser(id)) {
                 return ResponseEntity.ok().build();
             }
             return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.badRequest().body("Failed to delete user: " + e.getMessage());
-        }
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
+    @PutMapping("/{id}/unlock")
+    public ResponseEntity<?> unlockUser(@PathVariable Long id) {
+        return userService.getById(id).map(user -> {
+            user.setAccountLocked(false);
+            user.setFailedLoginAttempts(0);
+            return ResponseEntity.ok(userService.saveUser(user));
+        }).orElse(ResponseEntity.notFound().build());
     }
 }

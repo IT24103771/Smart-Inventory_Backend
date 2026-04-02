@@ -1,38 +1,64 @@
 package com.example.demo.Sales;
 
 import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/sales")
-@CrossOrigin(origins = "http://localhost:3000")
+@CrossOrigin(origins = "*")
 public class SaleController {
 
     private final SaleService saleService;
+    private final SaleBillService saleBillService;
 
-    public SaleController(SaleService saleService) {
+    public SaleController(SaleService saleService, SaleBillService saleBillService) {
         this.saleService = saleService;
+        this.saleBillService = saleBillService;
+    }
+
+    private String currentUsername() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getPrincipal() == null) return "System";
+        return auth.getName();
     }
 
     @PostMapping
-    public SaleResponse create(@Valid @RequestBody CreateSaleRequest req) {
-        return saleService.create(req);
+    public ResponseEntity<?> create(@Valid @RequestBody CreateSaleRequest req) {
+        try {
+            BillResponse bill = saleBillService.createSingleSale(req, currentUsername());
+            return ResponseEntity.ok(bill);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
     }
 
     @GetMapping
-    public List<SaleResponse> getAll() {
-        return saleService.getAll();
+    public ResponseEntity<List<SaleResponse>> getAll() {
+        return ResponseEntity.ok(saleService.getAll());
     }
 
     @PutMapping("/{id}")
-    public SaleResponse update(@PathVariable Long id, @Valid @RequestBody CreateSaleRequest req) {
-        return saleService.update(id, req);
+    public ResponseEntity<?> update(@PathVariable Long id, @Valid @RequestBody CreateSaleRequest req) {
+        try {
+            return ResponseEntity.ok(saleService.update(id, req));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
     }
 
     @DeleteMapping("/{id}")
-    public void delete(@PathVariable Long id) {
-        saleService.delete(id);
+    public ResponseEntity<?> delete(@PathVariable Long id) {
+        try {
+            saleService.delete(id);
+            return ResponseEntity.ok(Map.of("message", "Sale deleted successfully."));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
     }
 }

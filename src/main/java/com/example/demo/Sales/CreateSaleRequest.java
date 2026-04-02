@@ -2,32 +2,53 @@ package com.example.demo.Sales;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+
 import java.time.LocalDate;
 
 public class CreateSaleRequest {
 
-    @NotNull
+    @NotNull(message = "Product is required")
     private Long productId;
 
-    @NotNull
-    private Long batchId;   // ✅ NEW: which batch is being sold
+    @NotNull(message = "Batch is required")
+    private Long batchId;
 
-    @NotNull
-    @Min(1)
+    @NotNull(message = "Quantity is required")
+    @Min(value = 1, message = "Quantity must be at least 1")
     private Integer quantity;
 
-    @NotNull
+    @NotNull(message = "Sale date is required")
     private LocalDate saleDate;
 
-    public Long getProductId() { return productId; }
-    public void setProductId(Long productId) { this.productId = productId; }
+    public Long getProductId() {
+        return productId;
+    }
 
-    public Long getBatchId() { return batchId; }
-    public void setBatchId(Long batchId) { this.batchId = batchId; }
+    public void setProductId(Long productId) {
+        this.productId = productId;
+    }
 
-    public Integer getQuantity() { return quantity; }
-    public void setQuantity(Integer quantity) { this.quantity = quantity; }
+    public Long getBatchId() {
+        return batchId;
+    }
 
-    public LocalDate getSaleDate() { return saleDate; }
-    public void setSaleDate(LocalDate saleDate) { this.saleDate = saleDate; }
+    public void setBatchId(Long batchId) {
+        this.batchId = batchId;
+    }
+
+    public Integer getQuantity() {
+        return quantity;
+    }
+
+    public void setQuantity(Integer quantity) {
+        this.quantity = quantity;
+    }
+
+    public LocalDate getSaleDate() {
+        return saleDate;
+    }
+
+    public void setSaleDate(LocalDate saleDate) {
+        this.saleDate = saleDate;
+    }
 }
