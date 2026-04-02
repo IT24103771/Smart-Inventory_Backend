@@ -12,11 +12,14 @@ public class DiscountService {
 
     private final DiscountRepository discountRepository;
     private final ProductRepository productRepository;
+    private final com.example.demo.Inventory.InventoryRepository inventoryRepository;
 
     public DiscountService(DiscountRepository discountRepository,
-                           ProductRepository productRepository) {
+                           ProductRepository productRepository,
+                           com.example.demo.Inventory.InventoryRepository inventoryRepository) {
         this.discountRepository = discountRepository;
         this.productRepository = productRepository;
+        this.inventoryRepository = inventoryRepository;
     }
 
     public DiscountResponse create(CreateDiscountRequest req) {
@@ -27,8 +30,23 @@ public class DiscountService {
 
         validateDiscount(req);
 
+        com.example.demo.Inventory.Inventory batch = null;
+        if (req.getBatchId() != null) {
+            batch = inventoryRepository.findById(req.getBatchId())
+                    .orElseThrow(() -> new RuntimeException("Batch not found: " + req.getBatchId()));
+            
+            if (!batch.getProduct().getProductId().equals(product.getProductId())) {
+                throw new RuntimeException("Selected batch does not belong to the selected product.");
+            }
+            
+            if (discountRepository.existsActiveByBatchId(req.getBatchId())) {
+                throw new RuntimeException("An active discount already exists for this batch. Only one active discount allowed per batch.");
+            }
+        }
+
         Discount discount = new Discount();
         discount.setProduct(product);
+        discount.setInventoryBatch(batch);
         discount.setDiscountPercent(req.getDiscountPercent());
         discount.setNote(req.getNote() != null ? req.getNote().trim() : null);
         discount.setActive(req.getActive() != null ? req.getActive() : true);
@@ -71,7 +89,24 @@ public class DiscountService {
                         new RuntimeException("Product not found: " + req.getProductId())
                 );
 
+        com.example.demo.Inventory.Inventory batch = null;
+        if (req.getBatchId() != null) {
+            batch = inventoryRepository.findById(req.getBatchId())
+                    .orElseThrow(() -> new RuntimeException("Batch not found: " + req.getBatchId()));
+            
+            if (!batch.getProduct().getProductId().equals(product.getProductId())) {
+                throw new RuntimeException("Selected batch does not belong to the selected product.");
+            }
+            // Check duplicate only if changing batch to a new one
+            if (discount.getInventoryBatch() == null || !discount.getInventoryBatch().getId().equals(req.getBatchId())) {
+                if (discountRepository.existsActiveByBatchId(req.getBatchId())) {
+                    throw new RuntimeException("An active discount already exists for this batch.");
+                }
+            }
+        }
+
         discount.setProduct(product);
+        discount.setInventoryBatch(batch);
         discount.setDiscountPercent(req.getDiscountPercent());
         discount.setNote(req.getNote() != null ? req.getNote().trim() : null);
 
@@ -104,11 +139,21 @@ public class DiscountService {
         }
     }
 
+    public DiscountResponse lookupActive(Long productId, Long batchId) {
+        return discountRepository.findActiveByProductIdAndBatchId(productId, batchId)
+                .map(this::toResponse)
+                .orElse(null);
+    }
+
     private DiscountResponse toResponse(Discount d) {
         return new DiscountResponse(
                 d.getId(),
                 d.getProduct().getProductId(),
                 d.getProduct().getProductName(),
+                d.getInventoryBatch() != null ? d.getInventoryBatch().getId() : null,
+                d.getInventoryBatch() != null ? d.getInventoryBatch().getBatchNumber() : null,
+                d.getInventoryBatch() != null ? d.getInventoryBatch().getExpiryDate() : null,
+                d.getInventoryBatch() != null ? d.getInventoryBatch().getQuantity() : null,
                 d.getDiscountPercent(),
                 d.getNote(),
                 d.getActive(),

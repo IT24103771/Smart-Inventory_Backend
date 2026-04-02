@@ -14,6 +14,13 @@ public class SaleResponse {
     private LocalDate expiryDate;
 
     private Integer quantity;
+    
+    private Double originalUnitPrice;
+    private Double discountPercent;
+    private Double discountedUnitPrice;
+    private Double totalAmount;
+    private String discountNote;
+
     private LocalDate saleDate;
     private LocalDateTime createdAt;
 
@@ -24,6 +31,11 @@ public class SaleResponse {
                         String batchNumber,
                         LocalDate expiryDate,
                         Integer quantity,
+                        Double originalUnitPrice,
+                        Double discountPercent,
+                        Double discountedUnitPrice,
+                        Double totalAmount,
+                        String discountNote,
                         LocalDate saleDate,
                         LocalDateTime createdAt) {
         this.id = id;
@@ -33,6 +45,11 @@ public class SaleResponse {
         this.batchNumber = batchNumber;
         this.expiryDate = expiryDate;
         this.quantity = quantity;
+        this.originalUnitPrice = originalUnitPrice;
+        this.discountPercent = discountPercent;
+        this.discountedUnitPrice = discountedUnitPrice;
+        this.totalAmount = totalAmount;
+        this.discountNote = discountNote;
         this.saleDate = saleDate;
         this.createdAt = createdAt;
     }
@@ -46,6 +63,12 @@ public class SaleResponse {
     public LocalDate getExpiryDate() { return expiryDate; }
 
     public Integer getQuantity() { return quantity; }
+    public Double getOriginalUnitPrice() { return originalUnitPrice; }
+    public Double getDiscountPercent() { return discountPercent; }
+    public Double getDiscountedUnitPrice() { return discountedUnitPrice; }
+    public Double getTotalAmount() { return totalAmount; }
+    public String getDiscountNote() { return discountNote; }
+
     public LocalDate getSaleDate() { return saleDate; }
     public LocalDateTime getCreatedAt() { return createdAt; }
 }

@@ -16,6 +16,10 @@ public class Discount {
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
+    @ManyToOne(optional = true, fetch = FetchType.LAZY)
+    @JoinColumn(name = "inventory_id", nullable = true)
+    private com.example.demo.Inventory.Inventory inventoryBatch;
+
     @Column(name = "discount_percent", nullable = false)
     private Double discountPercent;
 
@@ -34,6 +38,9 @@ public class Discount {
 
     public Product getProduct() { return product; }
     public void setProduct(Product product) { this.product = product; }
+
+    public com.example.demo.Inventory.Inventory getInventoryBatch() { return inventoryBatch; }
+    public void setInventoryBatch(com.example.demo.Inventory.Inventory inventoryBatch) { this.inventoryBatch = inventoryBatch; }
 
     public Double getDiscountPercent() { return discountPercent; }
     public void setDiscountPercent(Double discountPercent) { this.discountPercent = discountPercent; }

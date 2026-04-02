@@ -16,13 +16,16 @@ public class SaleService {
     private final SaleRepository saleRepository;
     private final ProductRepository productRepository;
     private final InventoryRepository inventoryRepository;
+    private final com.example.demo.Discount.DiscountRepository discountRepository;
 
     public SaleService(SaleRepository saleRepository,
                        ProductRepository productRepository,
-                       InventoryRepository inventoryRepository) {
+                       InventoryRepository inventoryRepository,
+                       com.example.demo.Discount.DiscountRepository discountRepository) {
         this.saleRepository = saleRepository;
         this.productRepository = productRepository;
         this.inventoryRepository = inventoryRepository;
+        this.discountRepository = discountRepository;
     }
 
     @Transactional
@@ -69,6 +72,25 @@ public class SaleService {
         sale.setInventoryBatch(batch);
         sale.setQuantity(qty);
         sale.setSaleDate(req.getSaleDate());
+
+        // Price & Discount Calculation
+        Double originalPrice = product.getSellingPrice();
+        if (originalPrice == null) originalPrice = 0.0;
+        
+        java.util.Optional<com.example.demo.Discount.Discount> activeDiscount = discountRepository.findActiveByProductIdAndBatchId(product.getProductId(), batch.getId());
+        
+        Double discountPct = 0.0;
+        if (activeDiscount.isPresent()) {
+            discountPct = activeDiscount.get().getDiscountPercent();
+        }
+        
+        Double discountedPrice = originalPrice * (1.0 - (discountPct / 100.0));
+        Double totalAmt = discountedPrice * qty;
+        
+        sale.setOriginalUnitPrice(originalPrice);
+        sale.setDiscountPercent(discountPct);
+        sale.setDiscountedUnitPrice(discountedPrice);
+        sale.setTotalAmount(totalAmt);
 
         Sale saved = saleRepository.save(sale);
         return toResponse(saved);
@@ -127,6 +149,25 @@ public class SaleService {
         sale.setQuantity(newQty);
         sale.setSaleDate(req.getSaleDate());
 
+        // Price & Discount Calculation
+        Double originalPrice = newProduct.getSellingPrice();
+        if (originalPrice == null) originalPrice = 0.0;
+        
+        java.util.Optional<com.example.demo.Discount.Discount> activeDiscount = discountRepository.findActiveByProductIdAndBatchId(newProduct.getProductId(), newBatch.getId());
+        
+        Double discountPct = 0.0;
+        if (activeDiscount.isPresent()) {
+            discountPct = activeDiscount.get().getDiscountPercent();
+        }
+        
+        Double discountedPrice = originalPrice * (1.0 - (discountPct / 100.0));
+        Double totalAmt = discountedPrice * newQty;
+        
+        sale.setOriginalUnitPrice(originalPrice);
+        sale.setDiscountPercent(discountPct);
+        sale.setDiscountedUnitPrice(discountedPrice);
+        sale.setTotalAmount(totalAmt);
+
         return toResponse(saleRepository.save(sale));
     }
 
@@ -144,6 +185,13 @@ public class SaleService {
     }
 
     private SaleResponse toResponse(Sale s) {
+        
+        String dNote = null;
+        if (s.getDiscountPercent() != null && s.getDiscountPercent() > 0) {
+            java.util.Optional<com.example.demo.Discount.Discount> d = discountRepository.findActiveByProductIdAndBatchId(s.getProduct().getProductId(), s.getInventoryBatch().getId());
+            if (d.isPresent()) dNote = d.get().getNote();
+        }
+
         return new SaleResponse(
                 s.getId(),
                 s.getProduct().getProductId(),
@@ -152,6 +200,11 @@ public class SaleService {
                 s.getInventoryBatch().getBatchNumber(),
                 s.getInventoryBatch().getExpiryDate(),
                 s.getQuantity(),
+                s.getOriginalUnitPrice(),
+                s.getDiscountPercent(),
+                s.getDiscountedUnitPrice(),
+                s.getTotalAmount(),
+                dNote,
                 s.getSaleDate(),
                 s.getCreatedAt()
         );

@@ -31,6 +31,15 @@ public class DiscountController {
         return ResponseEntity.ok(discountService.getActive());
     }
 
+    @GetMapping("/lookup")
+    public ResponseEntity<DiscountResponse> lookupActive(@RequestParam Long productId, @RequestParam Long batchId) {
+        DiscountResponse res = discountService.lookupActive(productId, batchId);
+        if (res == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(res);
+    }
+
     @PatchMapping("/{id}/active")
     public ResponseEntity<DiscountResponse> setActive(@PathVariable Long id, @RequestParam boolean value) {
         return ResponseEntity.ok(discountService.setActive(id, value));

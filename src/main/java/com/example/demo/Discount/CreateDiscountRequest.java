@@ -7,6 +7,8 @@ public class CreateDiscountRequest {
     @NotNull(message = "productId is required")
     private Long productId;
 
+    private Long batchId;
+
     @NotNull(message = "discountPercent is required")
     @DecimalMin(value = "1.0", message = "discountPercent must be at least 1")
     @DecimalMax(value = "90.0", message = "discountPercent must be at most 90")
@@ -18,6 +20,9 @@ public class CreateDiscountRequest {
 
     public Long getProductId() { return productId; }
     public void setProductId(Long productId) { this.productId = productId; }
+
+    public Long getBatchId() { return batchId; }
+    public void setBatchId(Long batchId) { this.batchId = batchId; }
 
     public Double getDiscountPercent() { return discountPercent; }
     public void setDiscountPercent(Double discountPercent) { this.discountPercent = discountPercent; }

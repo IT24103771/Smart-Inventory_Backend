@@ -27,8 +27,20 @@ public class Sale {
     @Column(nullable = false)
     private Integer quantity;
 
+    @Column(name = "original_unit_price", nullable = false)
+    private Double originalUnitPrice = 0.0;
+
+    @Column(name = "discount_percent", nullable = false)
+    private Double discountPercent = 0.0;
+
+    @Column(name = "discounted_unit_price", nullable = false)
+    private Double discountedUnitPrice = 0.0;
+
+    @Column(name = "total_amount", nullable = false)
+    private Double totalAmount = 0.0;
+
     @Column(name = "sale_date", nullable = false)
-    private LocalDate saleDate;
+    private java.time.LocalDate saleDate;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
@@ -46,8 +58,20 @@ public class Sale {
     public Integer getQuantity() { return quantity; }
     public void setQuantity(Integer quantity) { this.quantity = quantity; }
 
-    public LocalDate getSaleDate() { return saleDate; }
-    public void setSaleDate(LocalDate saleDate) { this.saleDate = saleDate; }
+    public Double getOriginalUnitPrice() { return originalUnitPrice; }
+    public void setOriginalUnitPrice(Double originalUnitPrice) { this.originalUnitPrice = originalUnitPrice; }
+
+    public Double getDiscountPercent() { return discountPercent; }
+    public void setDiscountPercent(Double discountPercent) { this.discountPercent = discountPercent; }
+
+    public Double getDiscountedUnitPrice() { return discountedUnitPrice; }
+    public void setDiscountedUnitPrice(Double discountedUnitPrice) { this.discountedUnitPrice = discountedUnitPrice; }
+
+    public Double getTotalAmount() { return totalAmount; }
+    public void setTotalAmount(Double totalAmount) { this.totalAmount = totalAmount; }
+
+    public java.time.LocalDate getSaleDate() { return saleDate; }
+    public void setSaleDate(java.time.LocalDate saleDate) { this.saleDate = saleDate; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
