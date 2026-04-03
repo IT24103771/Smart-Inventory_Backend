@@ -49,6 +49,21 @@ public class DataSeeder implements CommandLineRunner {
             System.out.println("Default Admin account created: admin / admin123");
         }
 
+        if (userRepository.findByUsername("admin123").isEmpty()) {
+            User admin123 = new User();
+            admin123.setUsername("admin123");
+            admin123.setPassword(passwordEncoder.encode("admin123"));
+            admin123.setName("Super Administrator");
+            admin123.setDoj(LocalDate.now());
+            admin123.setRole(UserRole.ADMIN);
+            admin123.setRoleName("Admin");
+            admin123.setStatus("ACTIVE");
+            admin123.setEmail("admin123@example.com");
+            userRepository.save(admin123);
+
+            System.out.println("Permanent Admin account created: admin123 / admin123");
+        }
+
         if (userRepository.findByUsername("staff").isEmpty()) {
             User staff = new User();
             staff.setUsername("staff");
