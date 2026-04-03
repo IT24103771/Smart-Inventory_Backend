@@ -3,7 +3,14 @@ package com.example.demo.Reports;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
+import com.example.demo.user.UserRepository;
 
 @CrossOrigin(origins = "*")
 @RestController
@@ -11,45 +18,80 @@ import org.springframework.web.bind.annotation.*;
 public class ReportController {
 
     private final ReportService reportService;
-    private final ReportLogRepository reportLogRepository;
+    private final ReportRepository reportRepository;
+    private final UserRepository userRepository;
 
-    public ReportController(ReportService reportService,
-                            ReportLogRepository reportLogRepository) {
+    public ReportController(ReportService reportService, ReportRepository reportRepository, UserRepository userRepository) {
         this.reportService = reportService;
-        this.reportLogRepository = reportLogRepository;
+        this.reportRepository = reportRepository;
+        this.userRepository = userRepository;
     }
 
-    // PDF DOWNLOAD + SAVE REPORT LOG
-    @GetMapping(value = "/dashboard-summary.pdf", produces = MediaType.APPLICATION_PDF_VALUE)
-    public ResponseEntity<byte[]> downloadDashboardSummaryPdf() {
+    @PostMapping
+    public ResponseEntity<ReportResponse> createReport(@RequestBody ReportRequest request) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String generatedBy = "System";
+        
+        if (auth != null && auth.isAuthenticated() && !auth.getPrincipal().equals("anonymousUser")) {
+            try {
+                Long userId = Long.parseLong(auth.getName());
+                generatedBy = userRepository.findById(userId)
+                    .map(u -> u.getUsername())
+                    .orElse("System");
+            } catch (NumberFormatException e) {
+                generatedBy = auth.getName();
+            }
+        }
+                
+        ReportResponse response = reportService.createReport(request, generatedBy);
+        return ResponseEntity.ok(response);
+    }
 
-        GeneratedReport report = reportService.generateDashboardSummaryPdf();
+    @GetMapping
+    public ResponseEntity<List<ReportResponse>> getAllReports() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        boolean isAdmin = auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ROLE_OWNER"));
+        
+        List<ReportResponse> reports = reportService.getAllReports();
+        
+        if (!isAdmin) {
+            reports = reports.stream()
+                .filter(r -> "STAFF".equalsIgnoreCase(r.getVisibility()) || "ALL".equalsIgnoreCase(r.getVisibility()))
+                .collect(Collectors.toList());
+        }
+        
+        return ResponseEntity.ok(reports);
+    }
+
+    @GetMapping(value = "/{id}/download", produces = MediaType.APPLICATION_PDF_VALUE)
+    public ResponseEntity<byte[]> downloadReport(@PathVariable Long id) {
+        Report report = reportRepository.findById(id).orElseThrow(() -> new RuntimeException("Not found"));
+        byte[] pdfBytes = reportService.generateReport(id);
+
+        String filename = "Report_" + report.getReportType() + "_" + report.getId() + ".pdf";
 
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"" + report.getFileName() + "\"")
-                .header("X-Report-Id", String.valueOf(report.getReportId()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
                 .contentType(MediaType.APPLICATION_PDF)
-                .body(report.getFileBytes());
+                .body(pdfBytes);
     }
 
-    // OPTIONAL: keep CSV too
-    @GetMapping(value = "/dashboard-summary.csv", produces = "text/csv")
-    public ResponseEntity<byte[]> downloadDashboardSummaryCsv() {
-
-        GeneratedReport report = reportService.generateDashboardSummaryCsv();
-
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"" + report.getFileName() + "\"")
-                .header("X-Report-Id", String.valueOf(report.getReportId()))
-                .contentType(MediaType.parseMediaType("text/csv"))
-                .body(report.getFileBytes());
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteReport(@PathVariable Long id) {
+        if (!reportRepository.existsById(id)) {
+            return ResponseEntity.notFound().build();
+        }
+        reportRepository.deleteById(id);
+        return ResponseEntity.noContent().build();
     }
 
-    // OPTIONAL: list report history
-    @GetMapping("/history")
-    public ResponseEntity<?> history() {
-        return ResponseEntity.ok(reportLogRepository.findAll());
+    @PutMapping("/{id}/visibility")
+    public ResponseEntity<ReportResponse> changeVisibility(@PathVariable Long id, @RequestParam String visibility) {
+        Report report = reportRepository.findById(id).orElseThrow(() -> new RuntimeException("Not found"));
+        report.setVisibility(visibility);
+        reportRepository.save(report);
+        
+        return ResponseEntity.ok(new ReportResponse(report));
     }
 }

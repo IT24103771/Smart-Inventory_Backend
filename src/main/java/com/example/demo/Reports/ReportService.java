@@ -1,133 +1,266 @@
 package com.example.demo.Reports;
 
-import com.example.demo.Dashboard.DashboardService;
-import com.example.demo.Dashboard.DashboardSummaryResponse;
+import com.example.demo.Inventory.Inventory;
+import com.example.demo.Inventory.InventoryRepository;
+import com.example.demo.Sales.Sale;
+import com.example.demo.Sales.SaleRepository;
 import com.itextpdf.kernel.pdf.PdfDocument;
 import com.itextpdf.kernel.pdf.PdfWriter;
 import com.itextpdf.layout.Document;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.properties.TextAlignment;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
-import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class ReportService {
 
-    private final DashboardService dashboardService;
-    private final ReportLogRepository reportLogRepository;
+    private final ReportRepository reportRepository;
+    private final InventoryRepository inventoryRepository;
+    private final SaleRepository saleRepository;
 
-    public ReportService(DashboardService dashboardService,
-                         ReportLogRepository reportLogRepository) {
-        this.dashboardService = dashboardService;
-        this.reportLogRepository = reportLogRepository;
+    public ReportService(ReportRepository reportRepository, InventoryRepository inventoryRepository, SaleRepository saleRepository) {
+        this.reportRepository = reportRepository;
+        this.inventoryRepository = inventoryRepository;
+        this.saleRepository = saleRepository;
     }
 
-    public GeneratedReport generateDashboardSummaryPdf() {
+    public ReportResponse createReport(ReportRequest request, String username) {
+        Report report = new Report();
+        report.setReportTitle(request.getReportTitle());
+        report.setReportType(request.getReportType());
+        report.setFormat("PDF"); // Always forced
+        report.setStartDate(request.getStartDate());
+        report.setEndDate(request.getEndDate());
+        report.setVisibility(request.getVisibility() != null ? request.getVisibility() : "ADMIN");
+        report.setCreatedBy(username);
+        
+        Report savedReport = reportRepository.save(report);
+        return new ReportResponse(savedReport);
+    }
 
-        // 1) get dashboard data
-        DashboardSummaryResponse s = dashboardService.getSummary();
+    public List<ReportResponse> getAllReports() {
+        return reportRepository.findAll().stream()
+                .map(ReportResponse::new)
+                .collect(Collectors.toList());
+    }
 
-        // 2) build PDF in memory
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
+    public byte[] generateReport(Long reportId) {
+        Report report = reportRepository.findById(reportId)
+                .orElseThrow(() -> new RuntimeException("Report not found"));
 
-        PdfWriter writer = new PdfWriter(out);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        PdfWriter writer = new PdfWriter(baos);
         PdfDocument pdf = new PdfDocument(writer);
         Document document = new Document(pdf);
 
-        LocalDateTime now = LocalDateTime.now();
+        // Define Brand Colors
+        com.itextpdf.kernel.colors.Color brandSlate = new com.itextpdf.kernel.colors.DeviceRgb(15, 23, 42); // #0F172A
+        com.itextpdf.kernel.colors.Color brandGreen = new com.itextpdf.kernel.colors.DeviceRgb(0, 122, 94); // #007A5E
+        com.itextpdf.kernel.colors.Color white = new com.itextpdf.kernel.colors.DeviceRgb(255, 255, 255);
+        com.itextpdf.kernel.colors.Color slateLight = new com.itextpdf.kernel.colors.DeviceRgb(248, 250, 252);
 
-        document.add(new Paragraph("Dashboard Summary Report"));
-        document.add(new Paragraph("Generated At: " + now));
-        document.add(new Paragraph(" "));
+        // Header Block
+        Table headerTable = new Table(new float[]{1, 2, 1});
+        headerTable.setWidth(com.itextpdf.layout.properties.UnitValue.createPercentValue(100));
+        headerTable.setBackgroundColor(brandSlate);
+        
+        // Col 1: INVIGO Logo
+        com.itextpdf.layout.element.Cell logoCell = new com.itextpdf.layout.element.Cell()
+            .add(new Paragraph("INVIGO").setFontColor(brandGreen).setBold().setFontSize(26))
+            .setBorder(com.itextpdf.layout.borders.Border.NO_BORDER)
+            .setVerticalAlignment(com.itextpdf.layout.properties.VerticalAlignment.MIDDLE)
+            .setPadding(14);
+        
+        // Col 2: Title
+        com.itextpdf.layout.element.Cell titleCell = new com.itextpdf.layout.element.Cell()
+            .add(new Paragraph("System Intelligence Report").setFontColor(white).setFontSize(16))
+            .setBorder(com.itextpdf.layout.borders.Border.NO_BORDER)
+            .setVerticalAlignment(com.itextpdf.layout.properties.VerticalAlignment.MIDDLE)
+            .setPaddingLeft(10)
+            .setBorderLeft(new com.itextpdf.layout.borders.SolidBorder(white, 1f));
+        
+        // Col 3: Metadata
+        Paragraph metaPara = new Paragraph()
+            .add(new com.itextpdf.layout.element.Text("Generated: " + LocalDate.now() + "\n").setFontColor(white).setFontSize(10))
+            .add(new com.itextpdf.layout.element.Text("By: " + report.getCreatedBy()).setFontColor(white).setFontSize(10));
+        com.itextpdf.layout.element.Cell metaCell = new com.itextpdf.layout.element.Cell()
+            .add(metaPara)
+            .setBorder(com.itextpdf.layout.borders.Border.NO_BORDER)
+            .setVerticalAlignment(com.itextpdf.layout.properties.VerticalAlignment.MIDDLE)
+            .setTextAlignment(TextAlignment.RIGHT)
+            .setPadding(14);
 
-        Table table = new Table(2);
+        headerTable.addCell(logoCell);
+        headerTable.addCell(titleCell);
+        headerTable.addCell(metaCell);
+        document.add(headerTable);
+        document.add(new Paragraph("\n"));
 
-        table.addCell("Metric");
-        table.addCell("Value");
+        // Report Subtitle
+        document.add(new Paragraph(report.getReportTitle() + " (" + report.getReportType() + ")")
+                .setFontSize(14).setBold().setFontColor(brandSlate));
+        
+        if (report.getStartDate() != null && report.getEndDate() != null) {
+            document.add(new Paragraph("Date Range: " + report.getStartDate() + " to " + report.getEndDate())
+                    .setFontSize(10).setFontColor(brandSlate));
+        }
+        document.add(new Paragraph("\n"));
 
-        table.addCell("Total Products");
-        table.addCell(String.valueOf(s.getTotalProducts()));
+        switch (report.getReportType()) {
+            case INVENTORY:
+                generateInventoryTable(document, brandGreen, slateLight, brandSlate);
+                break;
+            case EXPIRED:
+                generateExpiredTable(document, report, brandGreen, slateLight, brandSlate);
+                break;
+            case NEAR_EXPIRY:
+                generateNearExpiryTable(document, brandGreen, slateLight, brandSlate);
+                break;
+            case SALES:
+                generateSalesTable(document, report, brandGreen, slateLight, brandSlate);
+                break;
+        }
 
-        table.addCell("Total Batches");
-        table.addCell(String.valueOf(s.getTotalBatches()));
-
-        table.addCell("Total Stock Qty");
-        table.addCell(String.valueOf(s.getTotalStockQty()));
-
-        table.addCell("Low Stock Batches");
-        table.addCell(String.valueOf(s.getLowStockBatches()));
-
-        table.addCell("Expiring Soon Batches (7 days)");
-        table.addCell(String.valueOf(s.getExpiringSoonBatches()));
-
-        table.addCell("Expired Batches");
-        table.addCell(String.valueOf(s.getExpiredBatches()));
-
-        table.addCell("Sales Today Qty");
-        table.addCell(String.valueOf(s.getSalesTodayQty()));
-
-        table.addCell("Active Discounts");
-        table.addCell(String.valueOf(s.getActiveDiscounts()));
-
-        document.add(table);
         document.close();
-
-        byte[] fileBytes = out.toByteArray();
-
-        // 3) save report log in DB
-        String fileName = "dashboard-summary-" + now.toLocalDate() + ".pdf";
-
-        ReportLog saved = reportLogRepository.save(
-                new ReportLog("DASHBOARD_SUMMARY_PDF", fileName, now)
-        );
-
-        // 4) return everything
-        return new GeneratedReport(
-                saved.getId(),
-                saved.getReportType(),
-                saved.getFileName(),
-                saved.getGeneratedAt(),
-                fileBytes
-        );
+        return baos.toByteArray();
     }
 
-    // OPTIONAL: keep CSV generation too
-    public GeneratedReport generateDashboardSummaryCsv() {
+    private void generateInventoryTable(Document document, com.itextpdf.kernel.colors.Color brandGreen, com.itextpdf.kernel.colors.Color slateLight, com.itextpdf.kernel.colors.Color brandSlate) {
+        List<Inventory> allInventory = inventoryRepository.findAll();
+        Table table = new Table(new float[]{3, 2, 1, 2, 2});
+        table.setWidth(com.itextpdf.layout.properties.UnitValue.createPercentValue(100));
 
-        DashboardSummaryResponse s = dashboardService.getSummary();
+        addTableHeader(table, brandGreen, white, "Product", "Batch", "Qty", "Expiry", "Status");
 
-        String csv = ""
-                + "Dashboard Report,Summary\n"
-                + "Generated At," + LocalDateTime.now() + "\n"
-                + "\n"
-                + "Metric,Value\n"
-                + "Total Products," + s.getTotalProducts() + "\n"
-                + "Total Batches," + s.getTotalBatches() + "\n"
-                + "Total Stock Qty," + s.getTotalStockQty() + "\n"
-                + "Low Stock Batches," + s.getLowStockBatches() + "\n"
-                + "Expiring Soon Batches (7 days)," + s.getExpiringSoonBatches() + "\n"
-                + "Expired Batches," + s.getExpiredBatches() + "\n"
-                + "Sales Today Qty," + s.getSalesTodayQty() + "\n"
-                + "Active Discounts," + s.getActiveDiscounts() + "\n";
+        int totalStock = 0;
+        int rowIndex = 0;
 
-        byte[] fileBytes = csv.getBytes(StandardCharsets.UTF_8);
+        for (Inventory inv : allInventory) {
+            totalStock += inv.getQuantity();
+            String status = "OK";
+            if (inv.getExpiryDate() != null && inv.getExpiryDate().isBefore(LocalDate.now())) {
+                status = "EXPIRED";
+            } else if (inv.getExpiryDate() != null && inv.getExpiryDate().isBefore(LocalDate.now().plusDays(7))) {
+                status = "NEAR_EXPIRY";
+            }
+            addTableRow(table, (rowIndex++ % 2 == 1) ? slateLight : null, 
+                inv.getProduct().getProductName(), inv.getBatchNumber(), String.valueOf(inv.getQuantity()), inv.getExpiryDate().toString(), status);
+        }
+        document.add(table);
+        document.add(new Paragraph("\nTotal Initialized Stock: " + totalStock).setBold().setFontColor(brandSlate));
+    }
 
-        LocalDateTime now = LocalDateTime.now();
-        String fileName = "dashboard-summary-" + now.toLocalDate() + ".csv";
+    private void generateExpiredTable(Document document, Report report, com.itextpdf.kernel.colors.Color brandGreen, com.itextpdf.kernel.colors.Color slateLight, com.itextpdf.kernel.colors.Color brandSlate) {
+        List<Inventory> expired = inventoryRepository.findAll().stream()
+                .filter(i -> i.getExpiryDate() != null && i.getExpiryDate().isBefore(LocalDate.now()))
+                .filter(i -> isWithinRange(i.getExpiryDate().atStartOfDay(), report.getStartDate(), report.getEndDate()))
+                .collect(Collectors.toList());
 
-        ReportLog saved = reportLogRepository.save(
-                new ReportLog("DASHBOARD_SUMMARY_CSV", fileName, now)
-        );
+        Table table = new Table(new float[]{3, 2, 2, 2});
+        table.setWidth(com.itextpdf.layout.properties.UnitValue.createPercentValue(100));
+        addTableHeader(table, brandGreen, white, "Product", "Batch", "Expired On", "Qty Lost");
 
-        return new GeneratedReport(
-                saved.getId(),
-                saved.getReportType(),
-                saved.getFileName(),
-                saved.getGeneratedAt(),
-                fileBytes
-        );
+        int totalLossQty = 0;
+        int rowIndex = 0;
+
+        for (Inventory inv : expired) {
+            totalLossQty += inv.getQuantity();
+            addTableRow(table, (rowIndex++ % 2 == 1) ? slateLight : null,
+                inv.getProduct().getProductName(), inv.getBatchNumber(), inv.getExpiryDate().toString(), String.valueOf(inv.getQuantity()));
+        }
+        document.add(table);
+        document.add(new Paragraph("\nTotal Expired Items: " + expired.size()).setBold().setFontColor(brandSlate));
+        document.add(new Paragraph("Total Quantity Lost: " + totalLossQty).setBold().setFontColor(brandSlate));
+    }
+
+    private void generateNearExpiryTable(Document document, com.itextpdf.kernel.colors.Color brandGreen, com.itextpdf.kernel.colors.Color slateLight, com.itextpdf.kernel.colors.Color brandSlate) {
+        LocalDate today = LocalDate.now();
+        LocalDate threshold = today.plusDays(7);
+
+        List<Inventory> nearExpiry = inventoryRepository.findAll().stream()
+                .filter(i -> i.getExpiryDate() != null && i.getExpiryDate().isAfter(today.minusDays(1)) 
+                          && i.getExpiryDate().isBefore(threshold.plusDays(1)))
+                .collect(Collectors.toList());
+
+        Table table = new Table(new float[]{3, 2, 1});
+        table.setWidth(com.itextpdf.layout.properties.UnitValue.createPercentValue(100));
+        addTableHeader(table, brandGreen, white, "Product", "Days Left", "Qty at Risk");
+
+        int totalNearExpiry = 0;
+        int rowIndex = 0;
+
+        for (Inventory inv : nearExpiry) {
+            long daysLeft = ChronoUnit.DAYS.between(today, inv.getExpiryDate());
+            totalNearExpiry += inv.getQuantity();
+            addTableRow(table, (rowIndex++ % 2 == 1) ? slateLight : null,
+                inv.getProduct().getProductName(), String.valueOf(daysLeft), String.valueOf(inv.getQuantity()));
+        }
+        document.add(table);
+        document.add(new Paragraph("\nItems At Risk: " + nearExpiry.size()).setBold().setFontColor(brandSlate));
+        document.add(new Paragraph("Total Quantity At Risk: " + totalNearExpiry).setBold().setFontColor(brandSlate));
+    }
+
+    private void generateSalesTable(Document document, Report report, com.itextpdf.kernel.colors.Color brandGreen, com.itextpdf.kernel.colors.Color slateLight, com.itextpdf.kernel.colors.Color brandSlate) {
+        List<Sale> allSales = saleRepository.findAll().stream()
+                .filter(s -> isWithinRange(s.getSaleDate().atStartOfDay(), report.getStartDate(), report.getEndDate()))
+                .collect(Collectors.toList());
+
+        Table table = new Table(new float[]{3, 1, 2, 2});
+        table.setWidth(com.itextpdf.layout.properties.UnitValue.createPercentValue(100));
+        addTableHeader(table, brandGreen, white, "Product", "Qty", "Date", "Revenue");
+
+        double totalRevenue = 0.0;
+        int totalSold = 0;
+        int rowIndex = 0;
+
+        for (Sale sale : allSales) {
+            totalRevenue += sale.getTotalAmount();
+            totalSold += sale.getQuantity();
+            addTableRow(table, (rowIndex++ % 2 == 1) ? slateLight : null,
+                sale.getProduct().getProductName(), String.valueOf(sale.getQuantity()), sale.getSaleDate().toString(), String.format("%.2f", sale.getTotalAmount()));
+        }
+        document.add(table);
+        document.add(new Paragraph("\nTotal Products Sold: " + totalSold).setBold().setFontColor(brandSlate));
+        document.add(new Paragraph("Total Gross Revenue: $" + String.format("%.2f", totalRevenue)).setBold().setFontColor(brandSlate));
+    }
+    
+    private com.itextpdf.kernel.colors.Color white = new com.itextpdf.kernel.colors.DeviceRgb(255, 255, 255);
+
+    private void addTableHeader(Table table, com.itextpdf.kernel.colors.Color bgColor, com.itextpdf.kernel.colors.Color fgColor, String... headers) {
+        for (String header : headers) {
+            table.addHeaderCell(new com.itextpdf.layout.element.Cell()
+                .add(new Paragraph(header).setBold().setFontColor(fgColor).setFontSize(9))
+                .setBackgroundColor(bgColor)
+                .setBorder(new com.itextpdf.layout.borders.SolidBorder(bgColor, 1f))
+                .setPadding(6)
+            );
+        }
+    }
+    
+    private void addTableRow(Table table, com.itextpdf.kernel.colors.Color bgColor, String... data) {
+        for (String cellData : data) {
+            com.itextpdf.layout.element.Cell cell = new com.itextpdf.layout.element.Cell()
+                .add(new Paragraph(cellData).setFontSize(9))
+                .setPadding(6)
+                .setBorder(new com.itextpdf.layout.borders.SolidBorder(new com.itextpdf.kernel.colors.DeviceRgb(226, 232, 240), 1f));
+            if (bgColor != null) {
+                cell.setBackgroundColor(bgColor);
+            }
+            table.addCell(cell);
+        }
+    }
+
+    private boolean isWithinRange(LocalDateTime date, LocalDate start, LocalDate end) {
+        if (start != null && date.toLocalDate().isBefore(start)) return false;
+        if (end != null && date.toLocalDate().isAfter(end)) return false;
+        return true;
     }
 }
